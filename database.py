@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 import logging
+import time
 
 # Load environment variables
 load_dotenv()
@@ -17,17 +18,37 @@ class Database:
         self.connect()
 
     def connect(self):
+        """Connect to MongoDB with retry logic"""
         try:
             mongodb_uri = os.environ.get('MONGODB_URI')
             if not mongodb_uri:
                 raise ValueError("MONGODB_URI environment variable not set")
             
-            self.client = MongoClient(mongodb_uri)
-            self.db = self.client.telegram_bot
-            logger.info("Successfully connected to MongoDB")
+            # Add retry logic for connection
+            max_retries = 3
+            retry_count = 0
+            while retry_count < max_retries:
+                try:
+                    self.client = MongoClient(mongodb_uri, 
+                                           serverSelectionTimeoutMS=5000,
+                                           connectTimeoutMS=5000)
+                    # Test the connection
+                    self.client.admin.command('ping')
+                    self.db = self.client.telegram_bot
+                    logger.info("Successfully connected to MongoDB")
+                    return
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count == max_retries:
+                        raise
+                    logger.warning(f"MongoDB connection attempt {retry_count} failed: {str(e)}")
+                    time.sleep(2)  # Wait before retrying
+                    
         except Exception as e:
             logger.error(f"Error connecting to MongoDB: {str(e)}")
-            raise
+            # Initialize with empty/mock database for graceful degradation
+            self.client = None
+            self.db = None
 
     # FMK Players Management
     def add_fmk_player(self, chat_id: int, user_id: int, user_name: str):
@@ -112,24 +133,37 @@ class Database:
     # Terms and Conditions Management
     def save_user_agreement(self, user_id: int, username: str, first_name: str, 
                            last_name: str, chat_id: int, chat_type: str):
-        """Save user's agreement to terms and conditions"""
+        """Save user agreement with retry logic"""
         try:
-            collection = self.db.user_agreements
-            agreement = {
-                "user_id": user_id,
-                "username": username,
-                "first_name": first_name,
-                "last_name": last_name,
-                "chat_id": chat_id,
-                "chat_type": chat_type,
-                "agreed_at": datetime.now()
-            }
-            result = collection.update_one(
-                {"user_id": user_id},
-                {"$set": agreement},
-                upsert=True
-            )
-            return result.modified_count > 0 or result.upserted_id is not None
+            if not self.db:
+                logger.error("Database not available")
+                return False
+
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    collection = self.db.user_agreements
+                    agreement_data = {
+                        "user_id": user_id,
+                        "username": username,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "chat_id": chat_id,
+                        "chat_type": chat_type,
+                        "agreed_at": datetime.now()
+                    }
+                    result = collection.update_one(
+                        {"user_id": user_id},
+                        {"$set": agreement_data},
+                        upsert=True
+                    )
+                    return result.modified_count > 0 or result.upserted_id is not None
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        raise
+                    logger.warning(f"Retry {attempt + 1} failed: {str(e)}")
+                    time.sleep(1)
+            return False
         except Exception as e:
             logger.error(f"Error saving user agreement: {str(e)}")
             return False
@@ -137,11 +171,16 @@ class Database:
     def has_user_agreed(self, user_id: int):
         """Check if user has agreed to terms and conditions"""
         try:
+            if not self.db:
+                logger.warning("Database not available, defaulting to requiring agreement")
+                return False
+                
             collection = self.db.user_agreements
             result = collection.find_one({"user_id": user_id})
             return bool(result)
         except Exception as e:
             logger.error(f"Error checking user agreement: {str(e)}")
+            # Default to requiring agreement if we can't check
             return False
 
     # Blocking functionality
@@ -176,13 +215,18 @@ class Database:
             return False
 
     def is_user_blocked(self, user_id: int):
-        """Check if user is blocked"""
+        """Check if user is blocked with fallback"""
         try:
+            if not self.db:
+                logger.warning("Database not available, defaulting to not blocked")
+                return False
+                
             collection = self.db.blocked_users
             result = collection.find_one({"user_id": user_id})
             return bool(result)
         except Exception as e:
             logger.error(f"Error checking blocked status: {str(e)}")
+            # Default to not blocked if we can't check
             return False
 
 # Create a singleton instance
