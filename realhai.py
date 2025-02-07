@@ -128,8 +128,8 @@ bot.session = create_bot_session()
 class GameReader:
     def __init__(self):
         logger.info("Initializing GameReader")
-        # Get the directory where the script is located
-        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        # Update path to use data folder
+        self.base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
         logger.info(f"Base path: {self.base_path}")
 
         self.files = {
@@ -1246,10 +1246,42 @@ def register_handlers():
 if __name__ == "__main__":
     logger.info("Starting bot...")
     register_handlers()
-    while True:
-        try:
-            bot.remove_webhook()
-            bot.infinity_polling(timeout=20, long_polling_timeout=5)
-        except Exception as e:
-            logger.error(f"Polling error: {str(e)}")
-            time.sleep(15)  # Wait before retrying
+    try:
+        # Get the port number from environment variable
+        port = int(environ.get('PORT', 5000))
+        
+        # Remove existing webhook
+        logger.info("Removing webhook")
+        bot.remove_webhook()
+        time.sleep(1)
+        
+        # Set webhook if RENDER_EXTERNAL_URL is provided
+        webhook_url = environ.get('RENDER_EXTERNAL_URL')
+        if webhook_url:
+            logger.info(f"Setting webhook to {webhook_url}")
+            bot.set_webhook(url=f"{webhook_url}/webhook")
+            
+            # Start Flask server
+            from flask import Flask, request
+            app = Flask(__name__)
+            
+            @app.route('/webhook', methods=['POST'])
+            def webhook():
+                if request.headers.get('content-type') == 'application/json':
+                    json_string = request.get_data().decode('utf-8')
+                    update = telebot.types.Update.de_json(json_string)
+                    bot.process_new_updates([update])
+                    return ''
+                else:
+                    return 'error', 403
+                    
+            # Start server
+            app.run(host='0.0.0.0', port=port)
+            
+        else:
+            # If no webhook URL, use polling (for local development)
+            logger.info("No webhook URL found, using polling")
+            bot.infinity_polling()
+            
+    except Exception as e:
+        logger.error(f"Bot error: {str(e)}")
