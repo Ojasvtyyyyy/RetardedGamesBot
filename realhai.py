@@ -113,7 +113,7 @@ chat_modes = {}  # Format: {chat_id: {'mode': MODE, 'last_activity': datetime}}
 # Add after line 91
 fmk_registered_users = defaultdict(set)  # Format: {chat_id: {user_id1, user_id2, ...}}
 
-# Update the TERMS_AND_CONDITIONS with more detailed terms
+# Update the TERMS_AND_CONDITIONS with modified terms
 TERMS_AND_CONDITIONS = """
 ℹ️ @RetardedGamesBotDevBot Terms and Conditions
 
@@ -121,137 +121,31 @@ By using the /gf (Girlfriend Chat) feature, you agree to the following comprehen
 
 1. LEGAL COMPLIANCE AND LIABILITY
 - You assume FULL legal responsibility for ALL interactions with the AI
-- ANY illegal activity will be reported to relevant authorities
+- Serious criminal activity will be reported to relevant authorities
 - You are solely liable for ANY consequences of your messages
-- We maintain the right to share chat logs with law enforcement
-- You indemnify us against ALL legal claims arising from your use
-- Criminal or civil misuse will result in immediate legal action
-- You bear ALL costs related to legal proceedings
-- We cooperate fully with law enforcement investigations
+- Criminal misuse will result in immediate legal action
+- To appeal a ban, contact @RetardedGamesBotDevBot
 
 2. CONTENT RESTRICTIONS
 - Strictly NO sexual, explicit, or NSFW content
-- NO requests for adult, erotic, or suggestive content
 - NO hate speech, discrimination, or harassment
 - NO promotion of illegal activities or substances
 - NO sharing of personal information
-- NO attempts to manipulate AI for harmful purposes
-- NO cryptocurrency or financial advice requests
-- NO medical or professional advice requests
-- NO political manipulation or propaganda
-- NO impersonation or identity theft
 - NO spam or commercial content
-- NO copyrighted material sharing
 
 3. DATA COLLECTION AND STORAGE
-- We permanently store ALL chat interactions
-- Data is shared with our AI providers and partners
-- We collect and retain indefinitely:
-  • Complete message history
+- We store chat interactions for moderation purposes only
+- Data is NOT sold or shared with third parties
+- Data is deleted after 1 year
+- To request data removal, contact @RetardedGamesBotDevBot
+- We collect and store:
+  • Message history
   • User ID
   • Username
-  • First Name
-  • Last Name
+  • First/Last Name
   • Chat ID
-  • Chat Type
   • Message timestamps
-  • Message content
-  • Bot responses
-- Data may be analyzed for compliance
-- No data deletion requests accepted
-- Data retention period: Indefinite
-
-4. USER CONDUCT AND RESPONSIBILITIES
-- You must be 18+ to use relationship features
-- You acknowledge this is an AI, not a real person
-- You will not develop emotional dependency
-- You will not attempt to bypass restrictions
-- You will not share access with others
-- You will not automate or bot interactions
-- You will report bugs and misuse
-- You accept monitoring of all interactions
-
-5. TECHNICAL LIMITATIONS
-- No guarantee of service availability
-- No backup or recovery obligations
-- No responsibility for data accuracy
-- May terminate service without notice
-- May modify features without warning
-- No refunds or compensation offered
-- Technical issues not our liability
-- Data loss possible and not compensated
-
-6. TERMINATION AND ENFORCEMENT
-- We can terminate access instantly
-- No appeal process for bans
-- No compensation for lost access
-- May report violations to authorities
-- May share violation data with third parties
-- May implement automatic bans
-- May restrict features without notice
-- Permanent bans at our discretion
-
-7. PRIVACY AND MONITORING
-- All chats are monitored and reviewed
-- AI responses are logged and analyzed
-- User patterns are tracked and stored
-- No expectation of privacy
-- Content may be reviewed by humans
-- May use data for AI training
-- May share anonymized data
-- May create user behavior profiles
-
-8. DISCLAIMER OF WARRANTIES
-- Service provided "AS IS"
-- No warranties of any kind
-- No guarantee of AI accuracy
-- May produce incorrect information
-- May exhibit unexpected behavior
-- No liability for AI responses
-- No responsibility for user actions
-- Use entirely at your own risk
-
-9. INDEMNIFICATION AND LIABILITY
-- You indemnify us against ALL claims
-- You cover ALL legal expenses
-- You accept unlimited liability
-- No caps on damage claims
-- Includes third-party claims
-- Covers all jurisdictions
-- Perpetual obligation
-- Includes class actions
-
-10. AGE AND CAPACITY
-- Must be 18+ to use service
-- Must be legally competent
-- Must understand all terms
-- Must accept all liability
-- Must have capacity to contract
-- Must provide accurate age
-- May require age verification
-- False information = instant ban
-
-11. JURISDICTION AND DISPUTES
-- All disputes under US law
-- You cover all legal costs
-- Binding arbitration required
-- No class action rights
-- Individual claims only
-- Your jurisdiction's laws apply
-- International laws observed
-- You pay all legal fees
-
-By clicking "I Agree", you explicitly confirm that:
-- You have read and FULLY understand ALL terms
-- You accept ALL legal responsibilities
-- You acknowledge ALL data collection practices
-- You accept ALL risks and liabilities
-- You are of legal age in your jurisdiction
-- You will comply with ALL restrictions
-- You accept possible legal consequences
-- You understand this is a binding agreement
-
-Click "I Agree" to accept ALL terms or "I Don't Agree" to decline.
+- Data is used only for moderation and compliance
 """
 
 # Helper Functions
@@ -547,14 +441,15 @@ def send_about(message):
             "• Content may be inappropriate for some users\n"
             "• Use at your own discretion\n"
             "• NSFW content is marked with 🔞\n\n"
-            "📌 By using this bot, you agree:\n"
-            "• This is for entertainment only\n"
-            "• Content is not to be taken seriously\n"
-            "• You are responsible for your use of the bot\n"
-            "• We log and store all chat interactions\n"
-            "• You are liable for your actions and messages\n\n"
-            "✉️ Want content removed or have concerns?\n"
-            "Contact: @RetardedGamesBotDevBot\n\n"
+            "📌 Data Policy:\n"
+            "• Chat logs stored for 1 year only\n"
+            "• Data used only for moderation\n"
+            "• We never sell or share your data\n"
+            "• Contact @RetardedGamesBotDevBot for data removal\n\n"
+            "✉️ Support:\n"
+            "• Ban appeals: @RetardedGamesBotDevBot\n"
+            "• Content removal: @RetardedGamesBotDevBot\n"
+            "• General concerns: @RetardedGamesBotDevBot\n\n"
             "Stay retarded! 🎮"
         )
         bot.reply_to(message, about_text)
@@ -1360,7 +1255,8 @@ def setup_commands():
             telebot.types.BotCommand("about", "❓ About this bot"),
             telebot.types.BotCommand("register", "📝 Register for FMK group chat game"),
             telebot.types.BotCommand("remove", "🚫 Remove yourself from FMK game"),
-            telebot.types.BotCommand("fmkgc", "👥 Play FMK with group members")
+            telebot.types.BotCommand("fmkgc", "👥 Play FMK with group members"),
+            telebot.types.BotCommand("history", "📜 View chat history (Admin only)")
         ]
 
         # Set commands for default scope (shows in all chats)
@@ -1497,6 +1393,7 @@ def register_handlers():
     bot.message_handler(commands=['start'])(send_welcome)
     bot.message_handler(commands=['help'])(send_help)
     bot.message_handler(commands=['about'])(send_about)
+    bot.message_handler(commands=['history'])(send_history)
     bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])(start_gf_chat)
     bot.message_handler(commands=['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
                                 'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk',
