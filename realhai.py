@@ -18,6 +18,8 @@ from requests.exceptions import ProxyError, ConnectionError
 import socket
 from os import environ
 from dotenv import load_dotenv
+from database import db
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Load environment variables
 load_dotenv()
@@ -108,6 +110,156 @@ chat_modes = {}  # Format: {chat_id: {'mode': MODE, 'last_activity': datetime}}
 
 # Add after line 91
 fmk_registered_users = defaultdict(set)  # Format: {chat_id: {user_id1, user_id2, ...}}
+
+# Update the TERMS_AND_CONDITIONS with more detailed terms
+TERMS_AND_CONDITIONS = """
+ℹ️ @RetardedGamesBotDevBot Terms and Conditions
+
+By using the /gf (Girlfriend Chat) feature, you agree to the following comprehensive terms and conditions:
+
+1. LEGAL COMPLIANCE AND LIABILITY
+- You assume FULL legal responsibility for ALL interactions with the AI
+- ANY illegal activity will be reported to relevant authorities
+- You are solely liable for ANY consequences of your messages
+- We maintain the right to share chat logs with law enforcement
+- You indemnify us against ALL legal claims arising from your use
+- Criminal or civil misuse will result in immediate legal action
+- You bear ALL costs related to legal proceedings
+- We cooperate fully with law enforcement investigations
+
+2. CONTENT RESTRICTIONS
+- Strictly NO sexual, explicit, or NSFW content
+- NO requests for adult, erotic, or suggestive content
+- NO hate speech, discrimination, or harassment
+- NO promotion of illegal activities or substances
+- NO sharing of personal information
+- NO attempts to manipulate AI for harmful purposes
+- NO cryptocurrency or financial advice requests
+- NO medical or professional advice requests
+- NO political manipulation or propaganda
+- NO impersonation or identity theft
+- NO spam or commercial content
+- NO copyrighted material sharing
+
+3. DATA COLLECTION AND STORAGE
+- We permanently store ALL chat interactions
+- Data is shared with our AI providers and partners
+- We collect and retain indefinitely:
+  • Complete message history
+  • User ID
+  • Username
+  • First Name
+  • Last Name
+  • Chat ID
+  • Chat Type
+  • Message timestamps
+  • Message content
+  • Bot responses
+- Data may be analyzed for compliance
+- No data deletion requests accepted
+- Data retention period: Indefinite
+
+4. USER CONDUCT AND RESPONSIBILITIES
+- You must be 18+ to use relationship features
+- You acknowledge this is an AI, not a real person
+- You will not develop emotional dependency
+- You will not attempt to bypass restrictions
+- You will not share access with others
+- You will not automate or bot interactions
+- You will report bugs and misuse
+- You accept monitoring of all interactions
+
+5. TECHNICAL LIMITATIONS
+- No guarantee of service availability
+- No backup or recovery obligations
+- No responsibility for data accuracy
+- May terminate service without notice
+- May modify features without warning
+- No refunds or compensation offered
+- Technical issues not our liability
+- Data loss possible and not compensated
+
+6. TERMINATION AND ENFORCEMENT
+- We can terminate access instantly
+- No appeal process for bans
+- No compensation for lost access
+- May report violations to authorities
+- May share violation data with third parties
+- May implement automatic bans
+- May restrict features without notice
+- Permanent bans at our discretion
+
+7. PRIVACY AND MONITORING
+- All chats are monitored and reviewed
+- AI responses are logged and analyzed
+- User patterns are tracked and stored
+- No expectation of privacy
+- Content may be reviewed by humans
+- May use data for AI training
+- May share anonymized data
+- May create user behavior profiles
+
+8. DISCLAIMER OF WARRANTIES
+- Service provided "AS IS"
+- No warranties of any kind
+- No guarantee of AI accuracy
+- May produce incorrect information
+- May exhibit unexpected behavior
+- No liability for AI responses
+- No responsibility for user actions
+- Use entirely at your own risk
+
+9. INDEMNIFICATION AND LIABILITY
+- You indemnify us against ALL claims
+- You cover ALL legal expenses
+- You accept unlimited liability
+- No caps on damage claims
+- Includes third-party claims
+- Covers all jurisdictions
+- Perpetual obligation
+- Includes class actions
+
+10. AGE AND CAPACITY
+- Must be 18+ to use service
+- Must be legally competent
+- Must understand all terms
+- Must accept all liability
+- Must have capacity to contract
+- Must provide accurate age
+- May require age verification
+- False information = instant ban
+
+11. JURISDICTION AND DISPUTES
+- All disputes under US law
+- You cover all legal costs
+- Binding arbitration required
+- No class action rights
+- Individual claims only
+- Your jurisdiction's laws apply
+- International laws observed
+- You pay all legal fees
+
+By clicking "I Agree", you explicitly confirm that:
+- You have read and FULLY understand ALL terms
+- You accept ALL legal responsibilities
+- You acknowledge ALL data collection practices
+- You accept ALL risks and liabilities
+- You are of legal age in your jurisdiction
+- You will comply with ALL restrictions
+- You accept possible legal consequences
+- You understand this is a binding agreement
+
+Click "I Agree" to accept ALL terms or "I Don't Agree" to decline.
+"""
+
+def create_agreement_keyboard():
+    """Create keyboard with agree/disagree buttons"""
+    keyboard = InlineKeyboardMarkup()
+    keyboard.row(
+        InlineKeyboardButton("I Agree ✅", callback_data="agree_terms"),
+        InlineKeyboardButton("I Don't Agree ❌", callback_data="disagree_terms")
+    )
+    return keyboard
 
 def create_bot_session():
     session = requests.Session()
@@ -363,11 +515,16 @@ def register_for_fmk(message):
         user_id = message.from_user.id
         user_name = message.from_user.first_name or message.from_user.username
 
-        if user_id in fmk_registered_users[chat_id]:
+        # Get current players from database
+        players = db.get_fmk_players(chat_id)
+        if any(player['user_id'] == user_id for player in players):
             return bot.reply_to(message, f"💫 {user_name}, you're already registered for FMK!")
 
-        fmk_registered_users[chat_id].add(user_id)
-        bot.reply_to(message, f"✅ {user_name} has been registered for FMK! Total players: {len(fmk_registered_users[chat_id])}")
+        # Add player to database
+        if db.add_fmk_player(chat_id, user_id, user_name):
+            bot.reply_to(message, f"✅ {user_name} has been registered for FMK! Total players: {len(players) + 1}")
+        else:
+            bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
     except Exception as e:
         logger.error(f"Error in register command: {str(e)}")
@@ -405,7 +562,8 @@ def fmk_group_chat(message):
         registered_users = list(fmk_registered_users[chat_id])
 
         if len(registered_users) < 3:
-            return bot.reply_to(message,
+            return bot.reply_to(
+                message,
                 "⚠️ Not enough players registered for FMK!\n"
                 "Need at least 3 players.\n"
                 "Use /register to join the game! 📝")
@@ -910,6 +1068,19 @@ def start_gf_chat(message):
         chat_id = message.chat.id
         user_id = message.from_user.id
 
+        # Check if user is blocked
+        if db.is_user_blocked(user_id):
+            return  # Silently ignore blocked users
+
+        # Check if user has agreed to terms
+        if not db.has_user_agreed(user_id):
+            return bot.send_message(
+                chat_id,
+                TERMS_AND_CONDITIONS,
+                reply_markup=create_agreement_keyboard()
+            )
+
+        # Rest of your existing start_gf_chat code...
         # Switch to chat mode
         set_chat_mode(chat_id, CHAT_MODE)
 
@@ -952,8 +1123,49 @@ def start_gf_chat(message):
         bot.reply_to(message, opening_message)
 
     except Exception as e:
-        logger.error(f"Error in gf command: {str(e)}", exc_info=True)
+        logger.error(f"Error in gf command: {str(e)}")
         bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=user_name))
+
+@bot.callback_query_handler(func=lambda call: call.data in ["agree_terms", "disagree_terms"])
+def handle_agreement(call):
+    """Handle user's agreement choice"""
+    try:
+        user_id = call.from_user.id
+        chat_id = call.message.chat.id
+        
+        if call.data == "agree_terms":
+            # Save user agreement
+            success = db.save_user_agreement(
+                user_id=user_id,
+                username=call.from_user.username,
+                first_name=call.from_user.first_name,
+                last_name=call.from_user.last_name,
+                chat_id=chat_id,
+                chat_type=call.message.chat.type
+            )
+            
+            if success:
+                bot.edit_message_text(
+                    "✅ Thank you for agreeing to the terms! You can now use the /gf command.",
+                    chat_id=chat_id,
+                    message_id=call.message.message_id
+                )
+            else:
+                bot.edit_message_text(
+                    "❌ Error saving agreement. Please try again later.",
+                    chat_id=chat_id,
+                    message_id=call.message.message_id
+                )
+        else:
+            bot.edit_message_text(
+                "❌ You must agree to the terms to use the /gf feature.",
+                chat_id=chat_id,
+                message_id=call.message.message_id
+            )
+            
+    except Exception as e:
+        logger.error(f"Error handling agreement: {str(e)}")
+        bot.answer_callback_query(call.id, "An error occurred. Please try again.")
 
 @bot.message_handler(func=lambda message: message.reply_to_message
                     and message.reply_to_message.from_user.id == bot.get_me().id)
@@ -1113,28 +1325,19 @@ def handle_all_messages(message):
         logger.error(f"Error in handle_all_messages: {str(e)}", exc_info=True)
 
 def log_interaction(message, response=None):
-    """Log user interactions to a file"""
+    """Log user interactions to database"""
     try:
-        log_file = "chat_history.txt"
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         user = message.from_user
-        chat_type = message.chat.type
-        
-        log_entry = (
-            f"Time: {current_time}\n"
-            f"User ID: {user.id}\n"
-            f"Username: @{user.username}\n"
-            f"First Name: {user.first_name}\n"
-            f"Last Name: {user.last_name}\n"
-            f"Chat Type: {chat_type}\n"
-            f"Chat ID: {message.chat.id}\n"
-            f"Message: {message.text}\n"
-            f"Response: {response}\n"
-            f"{'='*50}\n\n"
+        db.log_interaction(
+            user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            chat_id=message.chat.id,
+            chat_type=message.chat.type,
+            message=message.text,
+            response=response
         )
-        
-        with open(log_file, "a", encoding='utf-8') as f:
-            f.write(log_entry)
     except Exception as e:
         logger.error(f"Error logging interaction: {str(e)}")
 
@@ -1144,77 +1347,59 @@ def send_history(message):
     try:
         logger.debug(f"History command received from user {message.from_user.id}")
         
-        # Handle command with bot username
         if message.text.startswith('/history@'):
             if not message.text.endswith(f'@{bot.get_me().username}'):
                 logger.debug("Ignoring history command for different bot")
-                return  # Ignore if command is for different bot
-        
-        # Check if history file exists before asking for password
-        if not os.path.exists("chat_history.txt"):
-            logger.warning("chat_history.txt file not found")
-            return bot.reply_to(message, "No chat history file found!")
-            
-        # Log file permissions
-        try:
-            logger.debug(f"Chat history file permissions: {oct(os.stat('chat_history.txt').st_mode)[-3:]}")
-        except Exception as e:
-            logger.error(f"Could not check file permissions: {e}")
-                
-        # Clear any existing handlers for this chat
-        bot.clear_step_handler_by_chat_id(message.chat.id)
-        
-        # Ask for password
-        logger.debug("Sending password prompt")
+                return
+
         msg = bot.reply_to(message, "Please enter the admin password:")
-        
-        # Register the next step handler with explicit logging
-        logger.debug("Registering password check handler")
         bot.register_next_step_handler(msg, check_password)
-        logger.debug("Handler registration complete")
         
     except Exception as e:
-        logger.error(f"Error in history command: {str(e)}", exc_info=True)
+        logger.error(f"Error in history command: {str(e)}")
         bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
 def check_password(message):
     """Verify password and send history if correct"""
     try:
-        logger.debug(f"Password check triggered for user {message.from_user.id}")
-        
         if message.text == "iamgay123@#":
-            logger.debug("Correct password received")
-            
-            # Delete password message for security
+            # Delete password message
             try:
                 bot.delete_message(message.chat.id, message.message_id)
-                logger.debug("Password message deleted")
             except Exception as e:
                 logger.error(f"Could not delete password message: {e}")
-            
-            # Send the history file
-            if os.path.exists("chat_history.txt"):
-                logger.debug("Attempting to send history file")
-                try:
-                    with open("chat_history.txt", "rb") as file:
-                        bot.send_document(
-                            message.chat.id,
-                            file,
-                            caption="Here's the chat history!"
-                        )
-                    logger.debug("History file sent successfully")
-                except Exception as e:
-                    logger.error(f"Error sending file: {e}")
-                    bot.reply_to(message, "Error sending history file!")
+
+            # Get history from database
+            history = db.get_chat_history(100)  # Get last 100 interactions
+            if history:
+                # Format history into text
+                history_text = ""
+                for entry in history:
+                    history_text += (
+                        f"Time: {entry['timestamp']}\n"
+                        f"User: @{entry['username']}\n"
+                        f"Message: {entry['message']}\n"
+                        f"Response: {entry['response']}\n"
+                        f"{'='*50}\n\n"
+                    )
+                
+                # Save formatted history to temporary file
+                with open("temp_history.txt", "w", encoding='utf-8') as f:
+                    f.write(history_text)
+                
+                # Send file
+                with open("temp_history.txt", "rb") as f:
+                    bot.send_document(message.chat.id, f, caption="Here's the chat history!")
+                
+                # Clean up
+                os.remove("temp_history.txt")
             else:
-                logger.warning("History file not found during sending")
                 bot.reply_to(message, "No history found!")
         else:
-            logger.warning(f"Incorrect password attempt from user {message.from_user.id}")
             bot.reply_to(message, "Incorrect password!")
             
     except Exception as e:
-        logger.error(f"Error in password check: {str(e)}", exc_info=True)
+        logger.error(f"Error in password check: {str(e)}")
         bot.reply_to(message, "An error occurred!")
 
 # Add this at the bottom of your file, just before the if __name__ == "__main__": block
