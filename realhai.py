@@ -1047,6 +1047,7 @@ def setup_commands():
     """Setup bot commands with descriptions for the command menu"""
     try:
         commands = [
+            telebot.types.BotCommand("start", "🎮 Start the bot"),
             telebot.types.BotCommand("truth", "🎯 Get a random truth question"),
             telebot.types.BotCommand("thisorthat", "🤔 Get a This or That question"),
             telebot.types.BotCommand("neverhaveiever", "🎮 Get a Never Have I Ever statement"),
@@ -1057,21 +1058,14 @@ def setup_commands():
             telebot.types.BotCommand("evilornot", "😈 Evil or Not?"),
             telebot.types.BotCommand("fmk", "💘 Fuck, Marry, Kill"),
             telebot.types.BotCommand("gf", "💝 Chat with your clingy girlfriend"),
-            telebot.types.BotCommand("girlfriend", "💖 Same as /gf"),
-            telebot.types.BotCommand("bae", "💕 Another way to start chat"),
-            telebot.types.BotCommand("baby", "💗 One more way to begin"),
             telebot.types.BotCommand("random", "🎲 Get a random question"),
             telebot.types.BotCommand("stats", "📊 See question statistics"),
             telebot.types.BotCommand("help", "ℹ️ Show detailed help"),
             telebot.types.BotCommand("about", "❓ About this bot"),
             telebot.types.BotCommand("register", "📝 Register for FMK group chat game"),
             telebot.types.BotCommand("remove", "🚫 Remove yourself from FMK game"),
-            telebot.types.BotCommand("fmkgc", "👥 Play FMK with group members"),
-            telebot.types.BotCommand("history", "📋 Get chat history (Admin only)"),
+            telebot.types.BotCommand("fmkgc", "👥 Play FMK with group members")
         ]
-
-        # Get bot username
-        bot_username = bot.get_me().username
 
         # Set commands for default scope (shows in all chats)
         bot.set_my_commands(
@@ -1085,7 +1079,7 @@ def setup_commands():
             scope=telebot.types.BotCommandScopeAllGroupChats()
         )
 
-        logger.info(f"Bot commands setup successfully. Bot username: @{bot_username}")
+        logger.info("Bot commands setup successfully")
     except Exception as e:
         logger.error(f"Error setting up commands: {str(e)}")
 
@@ -1231,11 +1225,13 @@ def register_handlers():
     bot.message_handlers.clear()
     
     # Register all command handlers
-    bot.message_handler(commands=['history'])(send_history)
+    bot.message_handler(commands=['start'])(send_welcome)
+    bot.message_handler(commands=['help'])(send_help)
+    bot.message_handler(commands=['about'])(send_about)
     bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])(start_gf_chat)
     bot.message_handler(commands=['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
                                 'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk',
-                                'register', 'remove', 'fmkgc', 'help', 'about', 'random'])(handle_game_commands)
+                                'register', 'remove', 'fmkgc', 'random'])(handle_game_commands)
     
     # Register the general message handler
     bot.message_handler(func=lambda message: True)(handle_all_messages)
@@ -1246,6 +1242,7 @@ def register_handlers():
 if __name__ == "__main__":
     logger.info("Starting bot...")
     register_handlers()
+    setup_commands()
     try:
         # Get the port number from environment variable
         port = int(environ.get('PORT', 5000))
