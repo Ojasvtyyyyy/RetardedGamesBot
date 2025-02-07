@@ -254,6 +254,7 @@ By clicking "I Agree", you explicitly confirm that:
 Click "I Agree" to accept ALL terms or "I Don't Agree" to decline.
 """
 
+# Helper Functions
 def create_agreement_keyboard():
     """Create keyboard with agree/disagree buttons"""
     keyboard = InlineKeyboardMarkup()
@@ -262,6 +263,92 @@ def create_agreement_keyboard():
         InlineKeyboardButton("I Don't Agree ❌", callback_data="disagree_terms")
     )
     return keyboard
+
+def send_terms_and_conditions(chat_id):
+    """Send terms and conditions in multiple messages"""
+    try:
+        # First message with intro
+        bot.send_message(chat_id, "ℹ️ @RetardedGamesBotDevBot Terms and Conditions\n\nPlease read all terms carefully:")
+        
+        # Split terms into smaller chunks
+        terms_parts = [
+            # Part 1: Legal and Content
+            """1. LEGAL COMPLIANCE AND LIABILITY
+- You assume FULL legal responsibility for ALL interactions
+- ANY illegal activity will be reported to authorities
+- You are solely liable for ALL consequences
+- Criminal or civil misuse will result in legal action
+
+2. CONTENT RESTRICTIONS
+- NO sexual, explicit, or NSFW content
+- NO hate speech or harassment
+- NO illegal activities or substances
+- NO sharing of personal information
+- NO spam or commercial content""",
+
+            # Part 2: Data and Privacy
+            """3. DATA COLLECTION AND STORAGE
+- We store all chat interactions including:
+  • Message history
+  • User ID
+  • Username
+  • First/Last Name
+  • Chat ID
+  • Message timestamps
+- No data deletion requests accepted
+- Data retention period: Indefinite
+
+4. USER CONDUCT
+- Must be 18+ to use relationship features
+- No emotional dependency
+- No automation or bot interactions
+- Report bugs and misuse""",
+
+            # Part 3: Technical and Legal
+            """5. TECHNICAL LIMITATIONS
+- No guarantee of service availability
+- No backup or recovery obligations
+- May terminate service without notice
+
+6. ENFORCEMENT
+- We can terminate access instantly
+- No appeal process for bans
+- May report violations to authorities
+
+7. MONITORING
+- All chats are monitored
+- Content may be reviewed
+- No expectation of privacy""",
+
+            # Final part with agreement
+            """By clicking "I Agree", you confirm that:
+- You have read and understand ALL terms
+- You accept ALL legal responsibilities
+- You are of legal age in your jurisdiction
+- You understand this is a binding agreement
+
+Click below to accept or decline:"""
+        ]
+        
+        # Send each part with a small delay
+        for part in terms_parts:
+            bot.send_message(chat_id, part)
+            time.sleep(0.5)  # Small delay between messages
+            
+        # Send the final message with the agreement buttons
+        bot.send_message(
+            chat_id,
+            "Do you agree to all the terms and conditions?",
+            reply_markup=create_agreement_keyboard()
+        )
+        
+    except Exception as e:
+        logger.error(f"Error sending terms: {str(e)}")
+        bot.send_message(chat_id, "Error displaying terms. Please try again later.")
+
+def get_user_name(message):
+    """Get user's first name or username"""
+    return message.from_user.first_name or message.from_user.username or "baby"
 
 def create_bot_session():
     session = requests.Session()
@@ -870,10 +957,6 @@ def start_therapy(message):
         logger.error(f"Error in lifecoach command: {str(e)}")
         bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
-def get_user_name(message):
-    """Get user's first name or username"""
-    return message.from_user.first_name or message.from_user.username or "baby"
-
 def check_user_limit(user_id, user_name):
     """Check if user has hit daily limit"""
     current_date = datetime.now().date()
@@ -1468,86 +1551,3 @@ if __name__ == "__main__":
             
     except Exception as e:
         logger.error(f"Bot error: {str(e)}")
-
-# Add this function near your other helper functions
-def send_terms_and_conditions(chat_id):
-    """Send terms and conditions in multiple messages"""
-    try:
-        # First message with intro
-        bot.send_message(chat_id, "ℹ️ @RetardedGamesBotDevBot Terms and Conditions\n\nPlease read all terms carefully:")
-        
-        # Split terms into smaller chunks
-        terms_parts = [
-            # Part 1: Legal and Content
-            """1. LEGAL COMPLIANCE AND LIABILITY
-- You assume FULL legal responsibility for ALL interactions
-- ANY illegal activity will be reported to authorities
-- You are solely liable for ALL consequences
-- Criminal or civil misuse will result in legal action
-
-2. CONTENT RESTRICTIONS
-- NO sexual, explicit, or NSFW content
-- NO hate speech or harassment
-- NO illegal activities or substances
-- NO sharing of personal information
-- NO spam or commercial content""",
-
-            # Part 2: Data and Privacy
-            """3. DATA COLLECTION AND STORAGE
-- We store all chat interactions including:
-  • Message history
-  • User ID
-  • Username
-  • First/Last Name
-  • Chat ID
-  • Message timestamps
-- No data deletion requests accepted
-- Data retention period: Indefinite
-
-4. USER CONDUCT
-- Must be 18+ to use relationship features
-- No emotional dependency
-- No automation or bot interactions
-- Report bugs and misuse""",
-
-            # Part 3: Technical and Legal
-            """5. TECHNICAL LIMITATIONS
-- No guarantee of service availability
-- No backup or recovery obligations
-- May terminate service without notice
-
-6. ENFORCEMENT
-- We can terminate access instantly
-- No appeal process for bans
-- May report violations to authorities
-
-7. MONITORING
-- All chats are monitored
-- Content may be reviewed
-- No expectation of privacy""",
-
-            # Final part with agreement
-            """By clicking "I Agree", you confirm that:
-- You have read and understand ALL terms
-- You accept ALL legal responsibilities
-- You are of legal age in your jurisdiction
-- You understand this is a binding agreement
-
-Click below to accept or decline:"""
-        ]
-        
-        # Send each part with a small delay
-        for part in terms_parts:
-            bot.send_message(chat_id, part)
-            time.sleep(0.5)  # Small delay between messages
-            
-        # Send the final message with the agreement buttons
-        bot.send_message(
-            chat_id,
-            "Do you agree to all the terms and conditions?",
-            reply_markup=create_agreement_keyboard()
-        )
-        
-    except Exception as e:
-        logger.error(f"Error sending terms: {str(e)}")
-        bot.send_message(chat_id, "Error displaying terms. Please try again later.")
