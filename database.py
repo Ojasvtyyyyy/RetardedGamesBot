@@ -229,5 +229,25 @@ class Database:
             # Default to not blocked if we can't check
             return False
 
+    def is_user_registered(self, chat_id: int, user_id: int):
+        """Check if user is registered for FMK in this chat"""
+        try:
+            if self.db is None:
+                return False
+            
+            collection = self.db.fmk_players
+            result = collection.find_one({
+                "chat_id": chat_id,
+                "players": {
+                    "$elemMatch": {
+                        "user_id": user_id
+                    }
+                }
+            })
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Error checking FMK registration: {str(e)}")
+            return False
+
 # Create a singleton instance
 db = Database()
