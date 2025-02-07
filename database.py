@@ -135,7 +135,7 @@ class Database:
                            last_name: str, chat_id: int, chat_type: str):
         """Save user agreement with retry logic"""
         try:
-            if not self.db:
+            if self.db is None:
                 logger.error("Database not available")
                 return False
 
