@@ -20,6 +20,8 @@ from os import environ
 from dotenv import load_dotenv
 from database import db
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
 # Load environment variables
 load_dotenv()
@@ -1067,37 +1069,43 @@ def start_gf_chat(message):
     try:
         chat_id = message.chat.id
         user_id = message.from_user.id
-
-        # Check if user is blocked
-        if db.is_user_blocked(user_id):
-            return  # Silently ignore blocked users
-
-        # Check if user has agreed to terms
-        if not db.has_user_agreed(user_id):
-            return send_terms_and_conditions(chat_id)
-
-        # Rest of your existing code...
-        # Switch to chat mode
-        set_chat_mode(chat_id, CHAT_MODE)
-
-        logger.debug(f"Starting GF chat for user {user_id} in chat {chat_id}")
-
         user_name = get_user_name(message)
 
+        # Check if user is blocked
+        try:
+            if db.is_user_blocked(user_id):
+                logger.info(f"Blocked user {user_id} attempted to use /gf")
+                return
+        except Exception as e:
+            logger.error(f"Error checking block status: {str(e)}")
+            # Continue with default not-blocked behavior
+
+        # Check if user has agreed to terms
+        try:
+            if not db.has_user_agreed(user_id):
+                logger.info(f"User {user_id} needs to agree to terms")
+                return send_terms_and_conditions(chat_id)
+        except Exception as e:
+            logger.error(f"Error checking user agreement: {str(e)}")
+            # Continue with requiring agreement
+            return send_terms_and_conditions(chat_id)
+
         # Check if user is rate limited
-        if not check_rate_limit(message.from_user.id):
+        if not check_rate_limit(user_id):
             return bot.reply_to(
                 message,
                 f"{user_name} baby! 🥺 Itni jaldi jaldi baatein karne se meri heartbeat badh rahi hai! "
                 f"Thoda break lete hain na? 💕💖 {COOLDOWN_PERIOD} seconds mei wapas baat karenge! 💝"
             )
 
-        # Clear any existing next step handlers for this chat
+        # Switch to chat mode
+        set_chat_mode(chat_id, CHAT_MODE)
+
+        # Clear any existing next step handlers
         bot.clear_step_handler_by_chat_id(chat_id)
 
-        # Always end any existing conversation and start new one
+        # End any existing conversation
         if chat_id in active_conversations:
-            logger.debug(f"Ending existing conversation in chat {chat_id}")
             del active_conversations[chat_id]
 
         # Set this user as the active conversation holder
@@ -1106,20 +1114,17 @@ def start_gf_chat(message):
             'timestamp': datetime.now(),
             'last_interaction': datetime.now()
         }
-        logger.debug(f"Set active conversation for chat {chat_id} with user {user_id}")
 
         # Get random opening message
         opening_message = random.choice(OPENING_MESSAGES).format(name=user_name)
 
-        # Send typing action
-        bot.send_chat_action(message.chat.id, 'typing')
+        # Send typing action and message
+        bot.send_chat_action(chat_id, 'typing')
         time.sleep(1.5)
-
-        # Send message without registering next step handler
         bot.reply_to(message, opening_message)
 
     except Exception as e:
-        logger.error(f"Error in gf command: {str(e)}")
+        logger.error(f"Error in gf command: {str(e)}", exc_info=True)
         bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=user_name))
 
 @bot.callback_query_handler(func=lambda call: call.data in ["agree_terms", "disagree_terms"])
