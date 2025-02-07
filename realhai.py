@@ -516,24 +516,26 @@ def register_for_fmk(message):
 
 @bot.message_handler(commands=['remove'])
 def remove_from_fmk(message):
-    """Remove user from FMK game"""
+    """Handle the /remove command"""
     try:
-        if message.chat.type not in ['group', 'supergroup']:
-            return bot.reply_to(message, "📝 This command only works in group chats!")
-
         chat_id = message.chat.id
         user_id = message.from_user.id
-        user_name = message.from_user.first_name or message.from_user.username
+        user_name = get_user_name(message)
 
-        if user_id not in fmk_registered_users[chat_id]:
-            return bot.reply_to(message, f"❌ {user_name}, you're not registered for FMK!")
+        # Check if user is registered
+        if not db.is_user_registered(chat_id, user_id):
+            bot.reply_to(message, f"Hey {user_name}, you're not registered for FMK in this chat! Use /register to join.")
+            return
 
-        fmk_registered_users[chat_id].remove(user_id)
-        bot.reply_to(message, f"🚫 {user_name} has been removed from FMK! Total players: {len(fmk_registered_users[chat_id])}")
+        # Remove user from FMK players
+        if db.remove_fmk_player(chat_id, user_id):
+            bot.reply_to(message, f"Successfully removed {user_name} from FMK players!")
+        else:
+            bot.reply_to(message, f"Sorry {user_name}, couldn't remove you from FMK players. Please try again!")
 
     except Exception as e:
         logger.error(f"Error in remove command: {str(e)}")
-        bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
+        bot.reply_to(message, "Sorry, something went wrong. Please try again!")
 
 @bot.message_handler(commands=['fmkgc'])
 def fmk_group_chat(message):
@@ -583,22 +585,21 @@ bot.message_handler(commands=['redgreenflag'])(create_game_handler('redgreenflag
 bot.message_handler(commands=['evilornot'])(create_game_handler('evilornot', '😈'))
 bot.message_handler(commands=['fmk'])(create_game_handler('fmk', '💘'))
 
+def handle_random_command(message):
+    """Handle the /random command by selecting a random game"""
+    game_types = ['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather', 
+                  'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot']
+    random_game = random.choice(game_types)
+    emoji = get_emoji_for_game(random_game)
+    create_game_handler(random_game, emoji)(message)
+
 @bot.message_handler(commands=['random'])
-def random_question(message):
-    """Get a random question from any category"""
+def random_command(message):
     try:
-        # List of all game types excluding gf-related ones
-        game_types = ['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
-                     'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk']
-
-        # Randomly select a game type
-        game_type = random.choice(game_types)
-
-        # Get a question from that game type
-        create_game_handler(game_type, get_emoji_for_game(game_type))(message)
+        handle_random_command(message)
     except Exception as e:
-        logger.error(f"Error in random question: {str(e)}")
-        bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
+        logger.error(f"Error in random command: {str(e)}")
+        bot.reply_to(message, "Sorry, something went wrong. Please try again!")
 
 def get_emoji_for_game(game_type):
     """Get the corresponding emoji for a game type"""
@@ -616,21 +617,26 @@ def get_emoji_for_game(game_type):
     return emoji_map.get(game_type, '🎲')
 
 @bot.message_handler(commands=['stats'])
-def show_stats(message):
-    """Show bot statistics"""
+def send_stats(message):
+    """Handle the /stats command"""
     try:
-        stats = []
-        total = 0
-        for game, df in game_reader.dataframes.items():
-            count = len(df)
-            total += count
-            stats.append(f"📊 {game}: {count} questions")
-
-        stats_text = "\n".join(stats)
-        stats_text += f"\n\n🎯 Total: {total} questions!"
+        stats_text = (
+            "📊 Bot Statistics\n\n"
+            f"Total Questions:\n"
+            f"• Truth: {len(game_reader.dataframes.get('truth', []))}\n"
+            f"• This or That: {len(game_reader.dataframes.get('thisorthat', []))}\n"
+            f"• Never Have I Ever: {len(game_reader.dataframes.get('neverhaveiever', []))}\n"
+            f"• Would You Rather: {len(game_reader.dataframes.get('wouldyourather', []))}\n"
+            f"• Petitions: {len(game_reader.dataframes.get('petitions', []))}\n"
+            f"• NSFW WYR: {len(game_reader.dataframes.get('nsfwwyr', []))}\n"
+            f"• Red/Green Flag: {len(game_reader.dataframes.get('redgreenflag', []))}\n"
+            f"• Evil or Not: {len(game_reader.dataframes.get('evilornot', []))}\n"
+            f"• FMK: {len(game_reader.dataframes.get('fmk', []))}\n"
+        )
         bot.reply_to(message, stats_text)
     except Exception as e:
         logger.error(f"Error in stats command: {str(e)}")
+        bot.reply_to(message, "Sorry, couldn't fetch stats right now!")
 
 def is_game_response(message_text: str) -> bool:
     """Check if the message is a game response"""
@@ -1394,10 +1400,14 @@ def register_handlers():
     bot.message_handler(commands=['help'])(send_help)
     bot.message_handler(commands=['about'])(send_about)
     bot.message_handler(commands=['history'])(send_history)
+    bot.message_handler(commands=['stats'])(send_stats)
+    bot.message_handler(commands=['random'])(random_command)
     bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])(start_gf_chat)
+    bot.message_handler(commands=['register'])(register_for_fmk)
+    bot.message_handler(commands=['remove'])(remove_from_fmk)
     bot.message_handler(commands=['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
                                 'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk',
-                                'register', 'remove', 'fmkgc', 'random'])(handle_game_commands)
+                                'fmkgc'])(handle_game_commands)
     
     # Register the general message handler
     bot.message_handler(func=lambda message: True)(handle_all_messages)
