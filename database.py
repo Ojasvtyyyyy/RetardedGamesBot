@@ -171,7 +171,7 @@ class Database:
     def has_user_agreed(self, user_id: int):
         """Check if user has agreed to terms and conditions"""
         try:
-            if not self.db:
+            if self.db is None:
                 logger.warning("Database not available, defaulting to requiring agreement")
                 return False
                 
@@ -217,7 +217,7 @@ class Database:
     def is_user_blocked(self, user_id: int):
         """Check if user is blocked with fallback"""
         try:
-            if not self.db:
+            if self.db is None:
                 logger.warning("Database not available, defaulting to not blocked")
                 return False
                 
