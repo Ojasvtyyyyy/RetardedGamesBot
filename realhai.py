@@ -569,7 +569,7 @@ def remove_from_fmk(message):
 
         # Remove user from FMK players
         if db.remove_fmk_player(chat_id, user_id):
-            bot.reply_to(message, f"Successfully removed {user_name} from FMK players!")
+            bot.reply_to(message, f"ℹ️ Successfully removed {user_name} from FMK players!")
         else:
             bot.reply_to(message, f"Sorry {user_name}, couldn't remove you from FMK players. Please try again!")
 
@@ -683,7 +683,7 @@ def is_game_response(message_text: str) -> bool:
     # Game message patterns
     game_patterns = [
         # Emoji prefixes for different game types
-        "🎯", "🤔", "🎮", "💭", "📜", "🔞", "🚩", "😈", "💘", "🎲", "👥" "📊" "ℹ️", "💕",
+        "🎯", "🤔", "🎮", "💭", "📜", "🔞", "🚩", "😈", "💘", "🎲", "👥", "📊", "ℹ️", "💕",
         
         # Common game question patterns
         "Would you rather",
@@ -796,7 +796,7 @@ def get_gemini_response(prompt, context_key=None):
         f"You are a sweet and caring Indian girlfriend. Keep responses short, natural and casual. "
         "Mix Hindi (written in English letters) with English naturally, like Indians text each other. "
         "Use common Hindi words."
-        "Never use emojis. "
+        "Never use emojis. Use emoctions instead "
         "Be caring but not overly dramatic. Talk like a real young Indian girl would text. "
         "Keep messages short - usually 1-3 lines max. "
         "Avoid formal Hindi - use casual texting language. "
