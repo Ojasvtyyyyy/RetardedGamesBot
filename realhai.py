@@ -117,32 +117,83 @@ fmk_registered_users = defaultdict(set)  # Format: {chat_id: {user_id1, user_id2
 TERMS_AND_CONDITIONS = """
 ℹ️ @RetardedGamesBotDevBot Terms and Conditions
 
-By using the /gf (Girlfriend Chat) feature, you agree to the following terms:
+Please read all terms carefully:
 
 1. LEGAL COMPLIANCE AND LIABILITY
-- Users are solely responsible for their interactions
-- The bot owner is not liable for user-generated content or misuse
-- Serious violations will be reported to relevant authorities
-- To appeal actions, contact @RetardedGamesBotDevBot
+
+Users are solely responsible for their interactions.
+
+The bot owner is not liable for user-generated content or misuse.
+
+Serious violations may be reported to authorities.
+
+To appeal actions, contact @RetardedGamesBotDevBot (appeals may be considered at our discretion).
+
 
 2. CONTENT RESTRICTIONS
-- Content is controlled by Google's content filters
-- NO hate speech, discrimination, or harassment
-- NO sharing of personal information
-- NO spam or commercial content
 
-3. DATA COLLECTION AND STORAGE
-- We store chat interactions for moderation purposes only
-- Data is NOT sold or shared with third parties
-- Users may request data deletion when legally required
-- Some logs may be retained for security reasons
-- We collect and store:
-  • Message history
-  • User ID
-  • Username
-  • First/Last Name
-  • Chat ID
-  • Message timestamps
+Content is controlled by Google's content filters.
+
+NO hate speech, discrimination, or harassment.
+
+NO sharing of personal information.
+
+NO spam, scams, or commercial misuse.
+
+
+3. DATA COLLECTION & STORAGE
+
+We store all chat interactions, including:
+• Message history
+• User ID, Username, First/Last Name
+• Chat ID, Message timestamps
+
+Data deletion requests may be considered where legally required.
+
+Data retention period: Indefinite (for moderation & security).
+
+
+4. USER CONDUCT
+
+Must be 18+ to use relationship features.
+
+No emotional dependency or unhealthy reliance on AI.
+
+No automated/bot interactions.
+
+Report misuse immediately.
+
+
+5. TECHNICAL LIMITATIONS
+
+No guarantee of service availability.
+
+No obligation to restore lost chats.
+
+We may terminate service without notice.
+
+
+6. ENFORCEMENT
+
+We can ban users instantly for violating terms.
+
+Appeals may be considered but are not guaranteed.
+
+Serious violations may be reported to authorities.
+
+
+7. MONITORING & PRIVACY
+
+Chats are logged for moderation and security.
+
+We do not sell or share data with third parties.
+
+
+By clicking "I Agree," you confirm that:
+
+✔️ You understand and accept all terms.
+✔️ You are of legal age in your country.
+✔️ You understand that this is an AI bot, not a human.
 """
 
 # Helper Functions
@@ -1336,21 +1387,28 @@ def send_history(message):
     try:
         logger.debug(f"History command received from user {message.from_user.id}")
         
+        # Check if user is admin
+        if message.from_user.id != 6592905337:
+            return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
+        
         if message.text.startswith('/history@'):
             if not message.text.endswith(f'@{bot.get_me().username}'):
                 logger.debug("Ignoring history command for different bot")
                 return
 
-        msg = bot.reply_to(message, "Please enter the admin password:")
+        msg = bot.reply_to(message, "ℹ️ Please enter the admin password:")
         bot.register_next_step_handler(msg, check_password)
         
     except Exception as e:
         logger.error(f"Error in history command: {str(e)}")
-        bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
+        bot.reply_to(message, "ℹ️ Sorry, something went wrong. Please try again later.")
 
 def check_password(message):
     """Verify password and send history if correct"""
     try:
+        if message.from_user.id != 6592905337:
+            return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
+            
         if message.text == "iamgay123@#":
             # Delete password message
             try:
@@ -1362,7 +1420,7 @@ def check_password(message):
             history = db.get_chat_history(100)  # Get last 100 interactions
             if history:
                 # Format history into text
-                history_text = ""
+                history_text = "ℹ️ Chat History:\n\n"
                 for entry in history:
                     history_text += (
                         f"Time: {entry['timestamp']}\n"
@@ -1378,18 +1436,18 @@ def check_password(message):
                 
                 # Send file
                 with open("temp_history.txt", "rb") as f:
-                    bot.send_document(message.chat.id, f, caption="Here's the chat history!")
+                    bot.send_document(message.chat.id, f, caption="ℹ️ Here's the chat history!")
                 
                 # Clean up
                 os.remove("temp_history.txt")
             else:
-                bot.reply_to(message, "No history found!")
+                bot.reply_to(message, "ℹ️ No history found!")
         else:
-            bot.reply_to(message, "Incorrect password!")
+            bot.reply_to(message, "ℹ️ Incorrect password!")
             
     except Exception as e:
         logger.error(f"Error in password check: {str(e)}")
-        bot.reply_to(message, "An error occurred!")
+        bot.reply_to(message, "ℹ️ An error occurred!")
 
 # Add this at the bottom of your file, just before the if __name__ == "__main__": block
 def register_handlers():
@@ -1425,53 +1483,53 @@ def block_user_command(message):
     """Handle the /block command"""
     try:
         # Check if sender is admin
-        if message.from_user.id != 6592905337:  # Replace with your admin ID
-            return bot.reply_to(message, "You don't have permission to use this command.")
+        if message.from_user.id != 6592905337:
+            return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
             
         # Check if message is a reply
         if not message.reply_to_message:
-            return bot.reply_to(message, "Please reply to a message from the user you want to block.")
+            return bot.reply_to(message, "ℹ️ Please reply to a message from the user you want to block.")
             
         user_to_block = message.reply_to_message.from_user.id
         success = db.block_user(user_to_block, message.from_user.id)
         
         if success:
-            bot.reply_to(message, "User has been blocked from using /gf command.")
+            bot.reply_to(message, "ℹ️ User has been blocked from using /gf command.")
         else:
-            bot.reply_to(message, "Failed to block user. Please try again.")
+            bot.reply_to(message, "ℹ️ Failed to block user. Please try again.")
             
     except Exception as e:
         logger.error(f"Error in block command: {str(e)}")
-        bot.reply_to(message, "An error occurred while blocking the user.")
+        bot.reply_to(message, "ℹ️ An error occurred while blocking the user.")
 
 @bot.message_handler(commands=['unblock'])
 def unblock_user_command(message):
     """Handle the /unblock command"""
     try:
         # Check if sender is admin
-        if message.from_user.id != 6592905337:  # Replace with your admin ID
-            return bot.reply_to(message, "You don't have permission to use this command.")
+        if message.from_user.id != 6592905337:
+            return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
             
         # Get user ID from command arguments
         args = message.text.split()
         if len(args) != 2:
-            return bot.reply_to(message, "Please provide the user ID to unblock. Format: /unblock USER_ID")
+            return bot.reply_to(message, "ℹ️ Please provide the user ID to unblock. Format: /unblock USER_ID")
             
         try:
             user_to_unblock = int(args[1])
         except ValueError:
-            return bot.reply_to(message, "Invalid user ID format.")
+            return bot.reply_to(message, "ℹ️ Invalid user ID format.")
             
         success = db.unblock_user(user_to_unblock)
         
         if success:
-            bot.reply_to(message, "User has been unblocked.")
+            bot.reply_to(message, "ℹ️ User has been unblocked.")
         else:
-            bot.reply_to(message, "Failed to unblock user. Please try again.")
+            bot.reply_to(message, "ℹ️ Failed to unblock user. Please try again.")
             
     except Exception as e:
         logger.error(f"Error in unblock command: {str(e)}")
-        bot.reply_to(message, "An error occurred while unblocking the user.")
+        bot.reply_to(message, "ℹ️ An error occurred while unblocking the user.")
 
 # Modify your main block to include the handler registration
 if __name__ == "__main__":
