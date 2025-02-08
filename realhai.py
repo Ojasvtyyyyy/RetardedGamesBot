@@ -1408,16 +1408,14 @@ def register_handlers():
     bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])(start_gf_chat)
     bot.message_handler(commands=['register'])(register_for_fmk)
     bot.message_handler(commands=['remove'])(remove_from_fmk)
+    bot.message_handler(commands=['block'])(block_user_command)
+    bot.message_handler(commands=['unblock'])(unblock_user_command)
     bot.message_handler(commands=['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
                                 'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk',
                                 'fmkgc'])(handle_game_commands)
     
     # Register the general message handler
     bot.message_handler(func=lambda message: True)(handle_all_messages)
-    
-    # Add these lines with other command handlers
-    bot.message_handler(commands=['block'])(block_user_command)
-    bot.message_handler(commands=['unblock'])(unblock_user_command)
     
     logger.info("Message handlers registered successfully")
 
@@ -1451,7 +1449,7 @@ def unblock_user_command(message):
     """Handle the /unblock command"""
     try:
         # Check if sender is admin
-        if message.from_user.id != YOUR_ADMIN_ID:  # Replace with your admin ID
+        if message.from_user.id != 6592905337:  # Replace with your admin ID
             return bot.reply_to(message, "You don't have permission to use this command.")
             
         # Get user ID from command arguments
