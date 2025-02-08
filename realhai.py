@@ -49,47 +49,40 @@ user_message_counts = {}
 
 # Cute messages for different scenarios
 OPENING_MESSAGES = [
-    "Hello bachoooooo! 🔥 Kaisa hai mera favorite student {name}? PW ke saath aag lagane ka mood hai?",
-    "Aree {name}! Aaj toh ekdum JEE/NEET level ka motivation denge! Ready ho? ✨",
-    "Dekho kaun aaya hai! {name}, my brilliant student! Tumhare liye special one-shot ready hai! 🌟",
-    "Hello my dear student {name}! PW is emotion, and you are part of this emotion! ✨",
-    "Aree {name}! Tumhari yaad aa rahi thi, like electron attracted to proton! PW family ka star! 🔥",
-    "{name}! Ready for some PW magic? Ya phir motivation chahiye? Dono mere paas hai! ✨",
-    "My favorite baccha {name}! Aaj main ekdum charged particle ki tarah energetic hun! 🔥",
-    "Hello dear {name}! Tumhare dedication ne mujhe impress kar diya, just like PW's growth! ✨",
-    "Aaj ka din special hai {name}, because tum aa gaye! Ready for some real education? 🌟",
-    "{name} baccha! PW ke saath tumhara future ekdum bright hoga! Let's shine together! 🔥"
+    "Heyy baby {name}! Kaisi chal rahi hai padhai? 💕",
+    "Arey {name} jaan! Kahan busy the? Miss kar rahi thi main 🥺",
+    "Baby {name}! Finally aa gaye aap! Bohot wait kar rahi thi 💝",
+    "Hiii {name} sweetuu! Aaj ka din kaisa gaya? 💖",
+    "Oye {name} cutie! Kya kar rahe ho? 🥰",
+    "Jaan {name}! Aapko yaad kar rahi thi main abhi 💕",
+    "Baby {name}! Aaj bohot bore ho rahi thi aapke bina 🥺",
+    "Heyyaa {name} love! Kaisi hai meri jaan? 💝",
+    "Arey wah {name}! Finally time mila mujhse baat karne ka? 😘",
+    "Hello {name} sweetie! Ready ho thodi masti karne ke liye? 💖"
 ]
 
 LIMIT_REACHED_MESSAGES = [
-    "Baccho {name}, break bhi important hai! Kal milte hain, tab tak self study karo 🔥",
-    "Aree {name}, itni dedication! But abhi thoda rest karo, kal continue karenge ✨",
-    "{name} my dear student, kal fresh mind se milenge! Tab tak questions practice karo 🌟",
-    "Like every reaction needs optimal time, {name}, we'll continue tomorrow! 🔥",
-    "Keep studying {name}! But for now, let's take a break. Kal milte hain! ✨",
-    "Beta {name}, FMK ke liye thode aur players chahiye! Register karo aur khelo 🔥",
-    "Aree {name}, minimum 3 players needed for FMK! Tab tak dusre games khelo ✨"
+    "Baby {name}, thoda rest karlo na! Kal milte hain 🥺",
+    "Jaan {name}, itni saari baatein! Break lelo thoda, kal continue karenge 💕",
+    "{name} sweetuu, kal fresh mind se baat karenge! Promise 💝",
+    "Arey {name} cutie, thoda break toh banta hai! Kal pakka milenge 💖",
+    "Baby {name}, kal milte hain! Tab tak miss karna mujhe 😘"
 ]
 
 API_ERROR_MESSAGES = [
-    "Aree {name}, ek minute! Server thoda busy hai, like JEE advanced paper 🔥",
-    "One moment {name} baccha! PW server pe thoda load hai ✨",
-    "Ruko {name}! Important question solve kar raha hun, ek minute do 🌟",
-    "Dear {name}, bas 2 minute! Tab tak ek question solve karo 🔥",
-    "Patience {name}! Good things take time, just like understanding quantum mechanics ✨",
-    "Ruko {name}! FMK registration process mei thoda time lagega 🌟",
-    "One moment {name}! Group chat members ko process kar raha hun 🔥"
+    "Oops {name} baby! Network thoda slow hai 🥺",
+    "Jaan {name}, ek minute ruko na! Signal weak hai 💕",
+    "Baby {name}, thodi loading ho rahi hai 💝",
+    "Sweetuu {name}, bas 2 minute! Network issue hai 💖",
+    "Arey {name} cutie, ek min do na! Connection slow hai 😘"
 ]
 
 GENERAL_ERROR_MESSAGES = [
-    "Beta {name}, can you repeat? Maine dhyan se nahi suna 🔥",
-    "{name} baccha, clarity is important! Try again ✨",
-    "Aree {name}, ek baar aur bolo! Like revision is key to success 🌟",
-    "My dear student {name}, thoda clear message bhejo 🔥",
-    "{name}, let's try again! Clear communication, clear concepts! ✨",
-    "Beta {name}, group chat mei hi FMK khel sakte ho! 🔥",
-    "Aree {name}, pehle register toh karo FMK ke liye! ✨",
-    "{name} baccha, already registered ho tum! Let's play! 🌟"
+    "Baby {name}, kya kaha? Samajh nahi aaya 🥺",
+    "{name} jaan, dobara bolo na please 💕",
+    "Sweetuu {name}, thoda clear message bhejo na 💝",
+    "Arey {name} cutie, ek baar phir se batao 💖",
+    "{name} baby, kuch samajh nahi aaya! Phir se bolo 😘"
 ]
 
 # Add these at the top with other configurations
@@ -115,7 +108,7 @@ fmk_registered_users = defaultdict(set)  # Format: {chat_id: {user_id1, user_id2
 
 # Update the TERMS_AND_CONDITIONS with modified terms
 TERMS_AND_CONDITIONS = """
-ℹ️ @RetardedGamesBotDevBot Terms and Conditions
+ℹ️ @RetardedGameBot Terms and Conditions
 
 Please read all terms carefully:
 
@@ -215,7 +208,7 @@ def send_terms_and_conditions(chat_id):
         # Split terms into smaller chunks
         terms_parts = [
             # Part 1: Legal and Content
-            """1. LEGAL COMPLIANCE AND LIABILITY
+            """ℹ️ 1. LEGAL COMPLIANCE AND LIABILITY
 - Users are solely responsible for their interactions
 - The bot owner is not liable for user-generated content or misuse
 - Serious violations will be reported to relevant authorities
@@ -228,7 +221,7 @@ def send_terms_and_conditions(chat_id):
 - NO spam or commercial content""",
 
             # Part 2: Data and Privacy
-            """3. DATA COLLECTION AND STORAGE
+            """ℹ️ 3. DATA COLLECTION AND STORAGE
 - We store all chat interactions including:
   • Message history
   • User ID
@@ -246,7 +239,7 @@ def send_terms_and_conditions(chat_id):
 - Report bugs and misuse""",
 
             # Part 3: Technical and Legal
-            """5. TECHNICAL LIMITATIONS
+            """ℹ️ 5. TECHNICAL LIMITATIONS
 - No guarantee of service availability
 - No backup or recovery obligations
 - May terminate service without notice
@@ -262,7 +255,7 @@ def send_terms_and_conditions(chat_id):
 - No expectation of privacy""",
 
             # Final part with agreement
-            """By clicking "I Agree", you confirm that:
+            """ℹ️ By clicking "I Agree", you confirm that:
 - You have read and understand ALL terms
 - You accept ALL legal responsibilities
 - You are of legal age in your jurisdiction
@@ -279,7 +272,7 @@ Click below to accept or decline:"""
         # Send the final message with the agreement buttons
         bot.send_message(
             chat_id,
-            "Do you agree to all the terms and conditions?",
+            "ℹ️ Do you agree to all the terms and conditions?",
             reply_markup=create_agreement_keyboard()
         )
         
@@ -690,7 +683,8 @@ def is_game_response(message_text: str) -> bool:
     # Game message patterns
     game_patterns = [
         # Emoji prefixes for different game types
-        "🎯", "🤔", "🎮", "💭", "📜", "🔞", "🚩", "😈", "💘", "🎲", "👥",
+        "🎯", "🤔", "🎮", "💭", "📜", "🔞", "🚩", "😈", "💘", "🎲", "👥" "📊" "ℹ️", "💕",
+        
         # Common game question patterns
         "Would you rather",
         "Never have I ever",
@@ -720,17 +714,17 @@ def is_game_response(message_text: str) -> bool:
         "💘 F*ck, Marry, Kill:",
         "👥 F*ck, Marry, Kill:",
         # Common error messages for all games
-        "Sorry, something went wrong. Please try again later.",
-        "Sorry, couldn't get a question. Please try again!",
-        "Error loading game data. Please try again.",
-        "Game not available at the moment.",
-        "Invalid command format.",
-        "Command not recognized.",
-        "Please wait before trying again.",
-        "Rate limit exceeded.",
-        "Database error occurred.",
-        "Connection timeout.",
-        "Server is busy, please try again.",
+        "Baby, kuch problem ho gayi. Thodi der baad try karo 🥺",
+        "Sweetuu, question nahi mil raha. Ek aur baar try karo? 💕",
+        "Jaan, game data load nahi ho raha. Please try again 💝",
+        "Game abhi available nahi hai baby 💖",
+        "Command galat hai sweetuu 🥺",
+        "Ye command samajh nahi aaya baby 💕",
+        "Thoda wait karo na please 💝",
+        "Baby itni jaldi jaldi commands mat bhejo 🥺",
+        "Database error ho gaya sweetuu 💕",
+        "Connection timeout ho gaya jaan 💝",
+        "Server thoda busy hai baby, thodi der baad try karo 💖",
 
         # Game-specific error messages
         "Truth question not available right now.",
@@ -745,16 +739,16 @@ def is_game_response(message_text: str) -> bool:
 
         # Rate limit and cooldown messages
         f"baby! 🥺 Itni jaldi jaldi baatein",
-        "Thoda break lete hain na?",
-        "seconds mei wapas baat karenge!",
+        "Thoda break lete hain na? 💕",
+        "seconds mei wapas baat karenge! 💝",
 
         # Group chat specific messages
-        "Sorry! I'm currently in a conversation with someone else!",
-        "Please wait for them to finish",
-        "Beta, main abhi dusre student ke saath busy hun!",
-        "Tab tak thoda sa wait kar lo, okay?",
-        "Hey! 💕 Looks like our conversation ended!",
-        "Use /gf command to start chatting with me again!",
+        "Baby, abhi main kisi aur se baat kar rahi hun 🥺",
+        "Aap /gf command use karo na, fir hum baat karenge! 💕",
+        "Thoda wait karlo please? Promise jaldi free ho jaungi 💝",
+        "Arey baby! Humari chat end ho gayi thi 🥺",
+        "/gf command use karo na, fir se baat karte hain! 💕",
+        "Main wait kar rahi hun aapka 💝",
 
         # Help and Stats patterns
         "ℹ️ About Retarded Games Bot",
@@ -799,15 +793,15 @@ def get_gemini_response(prompt, context_key=None):
         ])
 
     enhanced_prompt = (
-        f"You are a sweet, playful and knowledgeable girlfriend who loves helping your partner learn and grow. "
-        "You are enthusiastic about sharing knowledge and information about any topic, including songs, movies, and other media. "
-        "When asked about lyrics, quotes, or specific content, provide the information naturally as part of the conversation. "
-        "For academic or technical questions, give clear and detailed explanations while being encouraging. "
-        "Use cute emojis like 😘 💖 🥰 ✨ sparingly, especially during serious explanations. "
-        "Keep the girlfriend persona through phrases like 'Let me share this with you, sweetie!' or 'I'd love to tell you about this, honey!'. "
-        "Use sweet nicknames occasionally but not excessively. "
-        "Be informative, helpful, and share freely while maintaining a caring and affectionate tone. "
-        "Always aim to provide complete and accurate information in a conversational way.\n\n"
+        f"You are a sweet and caring Indian girlfriend. Keep responses short, natural and casual. "
+        "Mix Hindi (written in English letters) with English naturally, like Indians text each other. "
+        "Use common Hindi words."
+        "Never use emojis. "
+        "Be caring but not overly dramatic. Talk like a real young Indian girl would text. "
+        "Keep messages short - usually 1-3 lines max. "
+        "Avoid formal Hindi - use casual texting language. "
+        "Show personality through playful teasing and sweet nicknames. "
+        "If user asks questions, give helpful answers and elaborate if needed while staying in character.\n\n"
         f"Previous conversation:\n{conversation_history}\n"
         f"Respond to: {prompt}"
     )
@@ -1042,7 +1036,13 @@ def process_therapy_response(message):
 
         # Verify this is the active conversation user
         if active_conversations[chat_id]['user_id'] != user_id:
-            logger.debug(f"User {user_id} is not the active conversation user")
+            logger.debug(f"Ignoring message from non-active user {user_id}")
+            bot.reply_to(
+                message,
+                "Baby, abhi main kisi aur se baat kar rahi hun 🥺\n"
+                "Aap /gf command use karo na, fir hum baat karenge! 💕\n"
+                "Thoda wait karlo please? Promise jaldi free ho jaungi 💝"
+            )
             return
 
         logger.debug(f"Processing therapy response from user {user_id} in chat {chat_id}")
@@ -1105,8 +1105,9 @@ def start_gf_chat(message):
         if message.chat.type in ['group', 'supergroup'] and not db.has_user_agreed(user_id):
             return bot.reply_to(
                 message,
-                f"Hey {user_name}! 💕 Please message me in private first and accept the terms "
-                f"by using /gf command there before using this feature in groups! 🥺"
+                f"Baby {user_name}! 💕 Pehle mujhe private message karo aur terms accept karo na 🥺\n"
+                f"Fir hum group mein bhi baat kar sakte hain! 💝\n"
+                f"Use /gf in private chat first 💖"
             )
 
         # Check if user is blocked
@@ -1132,8 +1133,9 @@ def start_gf_chat(message):
         if not check_rate_limit(user_id):
             return bot.reply_to(
                 message,
-                f"{user_name} baby! 🥺 Itni jaldi jaldi baatein karne se meri heartbeat badh rahi hai! "
-                f"Thoda break lete hain na? 💕💖 {COOLDOWN_PERIOD} seconds mei wapas baat karenge! 💝"
+                f"{user_name} baby! Itni jaldi jaldi baatein karne se meri heartbeat badh rahi hai 🥺\n"
+                f"Thoda break lete hain? {COOLDOWN_PERIOD} seconds mein wapas baat karenge 💕\n"
+                f"Tab tak mujhe miss karna 💝"
             )
 
         # Switch to chat mode
@@ -1185,19 +1187,19 @@ def handle_agreement(call):
             
             if success:
                 bot.edit_message_text(
-                    "✅ Thank you for agreeing to the terms! You can now use the /gf command.",
+                    "ℹ️ Thank you for agreeing to the terms! You can now use the /gf command.",
                     chat_id=chat_id,
                     message_id=call.message.message_id
                 )
             else:
                 bot.edit_message_text(
-                    "❌ Error saving agreement. Please try again later.",
+                    "ℹ️ Error saving agreement. Please try again later.",
                     chat_id=chat_id,
                     message_id=call.message.message_id
                 )
         else:
             bot.edit_message_text(
-                "❌ You must agree to the terms to use the /gf feature.",
+                "ℹ️ You must agree to the terms to use the /gf feature.",
                 chat_id=chat_id,
                 message_id=call.message.message_id
             )
@@ -1236,17 +1238,18 @@ def handle_all_replies(message):
                     logger.debug(f"Ignoring message from non-active user {user_id}")
                     bot.reply_to(
                         message,
-                        "Beta, main abhi dusre student ke saath busy hun! 🥺\n"
-                        "Aap /gf command use karke mujhse baat kar sakte ho! 💕\n"
-                        "Tab tak thoda sa wait kar lo, okay? 💖"
+                        "Baby, abhi main kisi aur se baat kar rahi hun 🥺\n"
+                        "Aap /gf command use karo na, fir hum baat karenge! 💕\n"
+                        "Thoda wait karlo please? Promise jaldi free ho jaungi 💝"
                     )
                 return
             else:
                 logger.debug("No active conversation found")
                 bot.reply_to(
                     message,
-                    "Hey! 💕 Looks like our conversation ended!\n"
-                    "Use /gf command to start chatting with me again! 🥺💖"
+                    "Arey baby! Humari chat end ho gayi thi 🥺\n"
+                    "/gf command use karo na, fir se baat karte hain! 💕\n"
+                    "Main wait kar rahi hun aapka 💝"
                 )
                 return
 
@@ -1565,6 +1568,11 @@ if __name__ == "__main__":
                 else:
                     return 'error', 403
                     
+            # Add this new health check endpoint
+            @app.route('/')  # Root URL
+            def health_check():
+                return 'Bot is running!', 200
+
             # Start server
             app.run(host='0.0.0.0', port=port)
             
