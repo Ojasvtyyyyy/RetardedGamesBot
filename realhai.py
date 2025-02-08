@@ -117,27 +117,25 @@ fmk_registered_users = defaultdict(set)  # Format: {chat_id: {user_id1, user_id2
 TERMS_AND_CONDITIONS = """
 ℹ️ @RetardedGamesBotDevBot Terms and Conditions
 
-By using the /gf (Girlfriend Chat) feature, you agree to the following comprehensive terms and conditions:
+By using the /gf (Girlfriend Chat) feature, you agree to the following terms:
 
 1. LEGAL COMPLIANCE AND LIABILITY
-- You assume FULL legal responsibility for ALL interactions with the AI
-- Serious criminal activity will be reported to relevant authorities
-- You are solely liable for ANY consequences of your messages
-- Criminal misuse will result in immediate legal action
-- To appeal a ban, contact @RetardedGamesBotDevBot
+- Users are solely responsible for their interactions
+- The bot owner is not liable for user-generated content or misuse
+- Serious violations will be reported to relevant authorities
+- To appeal actions, contact @RetardedGamesBotDevBot
 
 2. CONTENT RESTRICTIONS
-- Strictly NO sexual, explicit, or NSFW content
+- Content is controlled by Google's content filters
 - NO hate speech, discrimination, or harassment
-- NO promotion of illegal activities or substances
 - NO sharing of personal information
 - NO spam or commercial content
 
 3. DATA COLLECTION AND STORAGE
 - We store chat interactions for moderation purposes only
 - Data is NOT sold or shared with third parties
-- Data is deleted after 1 year
-- To request data removal, contact @RetardedGamesBotDevBot
+- Users may request data deletion when legally required
+- Some logs may be retained for security reasons
 - We collect and store:
   • Message history
   • User ID
@@ -145,7 +143,6 @@ By using the /gf (Girlfriend Chat) feature, you agree to the following comprehen
   • First/Last Name
   • Chat ID
   • Message timestamps
-- Data is used only for moderation and compliance
 """
 
 # Helper Functions
@@ -168,15 +165,14 @@ def send_terms_and_conditions(chat_id):
         terms_parts = [
             # Part 1: Legal and Content
             """1. LEGAL COMPLIANCE AND LIABILITY
-- You assume FULL legal responsibility for ALL interactions
-- ANY illegal activity will be reported to authorities
-- You are solely liable for ALL consequences
-- Criminal or civil misuse will result in legal action
+- Users are solely responsible for their interactions
+- The bot owner is not liable for user-generated content or misuse
+- Serious violations will be reported to relevant authorities
+- To appeal actions, contact @RetardedGamesBotDevBot
 
 2. CONTENT RESTRICTIONS
-- NO sexual, explicit, or NSFW content
-- NO hate speech or harassment
-- NO illegal activities or substances
+- Content is controlled by Google's content filters
+- NO hate speech, discrimination, or harassment
 - NO sharing of personal information
 - NO spam or commercial content""",
 
@@ -1049,11 +1045,18 @@ def process_therapy_response(message):
 
 @bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])
 def start_gf_chat(message):
-    """Handle girlfriend chat commands"""
     try:
         chat_id = message.chat.id
         user_id = message.from_user.id
         user_name = get_user_name(message)
+
+        # If in group chat and user hasn't agreed to terms
+        if message.chat.type in ['group', 'supergroup'] and not db.has_user_agreed(user_id):
+            return bot.reply_to(
+                message,
+                f"Hey {user_name}! 💕 Please message me in private first and accept the terms "
+                f"by using /gf command there before using this feature in groups! 🥺"
+            )
 
         # Check if user is blocked
         try:
@@ -1412,7 +1415,65 @@ def register_handlers():
     # Register the general message handler
     bot.message_handler(func=lambda message: True)(handle_all_messages)
     
+    # Add these lines with other command handlers
+    bot.message_handler(commands=['block'])(block_user_command)
+    bot.message_handler(commands=['unblock'])(unblock_user_command)
+    
     logger.info("Message handlers registered successfully")
+
+# Add these command handlers after other command handlers in register_handlers()
+@bot.message_handler(commands=['block'])
+def block_user_command(message):
+    """Handle the /block command"""
+    try:
+        # Check if sender is admin
+        if message.from_user.id != 6592905337:  # Replace with your admin ID
+            return bot.reply_to(message, "You don't have permission to use this command.")
+            
+        # Check if message is a reply
+        if not message.reply_to_message:
+            return bot.reply_to(message, "Please reply to a message from the user you want to block.")
+            
+        user_to_block = message.reply_to_message.from_user.id
+        success = db.block_user(user_to_block, message.from_user.id)
+        
+        if success:
+            bot.reply_to(message, "User has been blocked from using /gf command.")
+        else:
+            bot.reply_to(message, "Failed to block user. Please try again.")
+            
+    except Exception as e:
+        logger.error(f"Error in block command: {str(e)}")
+        bot.reply_to(message, "An error occurred while blocking the user.")
+
+@bot.message_handler(commands=['unblock'])
+def unblock_user_command(message):
+    """Handle the /unblock command"""
+    try:
+        # Check if sender is admin
+        if message.from_user.id != YOUR_ADMIN_ID:  # Replace with your admin ID
+            return bot.reply_to(message, "You don't have permission to use this command.")
+            
+        # Get user ID from command arguments
+        args = message.text.split()
+        if len(args) != 2:
+            return bot.reply_to(message, "Please provide the user ID to unblock. Format: /unblock USER_ID")
+            
+        try:
+            user_to_unblock = int(args[1])
+        except ValueError:
+            return bot.reply_to(message, "Invalid user ID format.")
+            
+        success = db.unblock_user(user_to_unblock)
+        
+        if success:
+            bot.reply_to(message, "User has been unblocked.")
+        else:
+            bot.reply_to(message, "Failed to unblock user. Please try again.")
+            
+    except Exception as e:
+        logger.error(f"Error in unblock command: {str(e)}")
+        bot.reply_to(message, "An error occurred while unblocking the user.")
 
 # Modify your main block to include the handler registration
 if __name__ == "__main__":
