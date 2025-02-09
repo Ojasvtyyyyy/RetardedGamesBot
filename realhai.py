@@ -431,6 +431,53 @@ class GameReader:
             logger.error(f"Error reloading {game_type}: {str(e)}")
             return False
 
+    def load_csv(self, game_type, file_path):
+        """Load a single CSV file into DataFrame"""
+        logger.info(f"Loading {game_type} from {file_path}")
+        
+        if not os.path.exists(file_path):
+            logger.error(f"File does not exist: {file_path}")
+            return False
+        
+        # List of encodings to try
+        encodings = ['utf-8-sig', 'utf-8', 'latin1', 'iso-8859-1', 'cp1252']
+        
+        for encoding in encodings:
+            try:
+                df = pd.read_csv(file_path,
+                               encoding=encoding,
+                               quoting=1,
+                               escapechar='\\',
+                               na_filter=False)
+                
+                if df.empty:
+                    logger.error(f"{file_path} is empty")
+                    continue
+                
+                # Clean the text data
+                if len(df.columns) > 0:
+                    df[df.columns[0]] = df[df.columns[0]].apply(lambda x:
+                        str(x).replace('"', '"')
+                        .replace('"', '"')
+                        .replace(''', "'")
+                        .replace(''', "'")
+                        .replace('…', '...')
+                        .strip())
+                    
+                self.dataframes[game_type] = df
+                logger.info(f"Successfully loaded {file_path} with {encoding} encoding. Shape: {df.shape}")
+                return True
+                
+            except UnicodeDecodeError:
+                logger.debug(f"Failed to read {file_path} with {encoding} encoding, trying next...")
+                continue
+            except Exception as e:
+                logger.error(f"Error loading {file_path}: {str(e)}")
+                return False
+                
+        logger.error(f"Failed to load {file_path} with any encoding")
+        return False
+
 # Initialize GameReader
 game_reader = GameReader()
 
@@ -1565,25 +1612,39 @@ def unblock_user_command(message):
     """Handle the /unblock command"""
     try:
         # Check if sender is admin
-        if message.from_user.id != 6592905337:
+        if message.from_user.id != 6592905337:  # Using same admin check as block command
             return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
-            
-        # Get user ID from command arguments
+
+        # Get command arguments
         args = message.text.split()
-        if len(args) != 2:
-            return bot.reply_to(message, "ℹ️ Please provide the user ID to unblock. Format: /unblock USER_ID")
-            
-        try:
-            user_to_unblock = int(args[1])
-        except ValueError:
-            return bot.reply_to(message, "ℹ️ Invalid user ID format.")
-            
-        success = db.unblock_user(user_to_block)
         
-        if success:
-            bot.reply_to(message, "ℹ️ User has been unblocked.")
-        else:
-            bot.reply_to(message, "ℹ️ Failed to unblock user. Please try again.")
+        # If command has a user ID argument
+        if len(args) == 2:
+            try:
+                user_to_unblock = int(args[1])
+                success = db.unblock_user(user_to_unblock)
+                
+                if success:
+                    bot.reply_to(message, f"ℹ️ User {user_to_unblock} has been unblocked.")
+                else:
+                    bot.reply_to(message, "ℹ️ Failed to unblock user. Please try again.")
+                return
+            except ValueError:
+                return bot.reply_to(message, "ℹ️ Invalid user ID format. Please provide a valid numeric ID.")
+        
+        # If command is a reply to a message
+        if message.reply_to_message:
+            user_to_unblock = message.reply_to_message.from_user.id
+            success = db.unblock_user(user_to_unblock)
+            
+            if success:
+                bot.reply_to(message, f"ℹ️ User {user_to_unblock} has been unblocked.")
+            else:
+                bot.reply_to(message, "ℹ️ Failed to unblock user. Please try again.")
+            return
+            
+        # If neither condition is met
+        bot.reply_to(message, "ℹ️ Please either:\n1. Reply to a message from the user you want to unblock\n2. Provide the user ID (e.g., /unblock 123456789)")
             
     except Exception as e:
         logger.error(f"Error in unblock command: {str(e)}")
