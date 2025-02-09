@@ -380,15 +380,23 @@ class GameReader:
                 logger.error(f"Failed to load {file_path} with any encoding")
 
     def get_random_question(self, game_type: str) -> Optional[str]:
+        """Get a random question from specified game type"""
         try:
             if game_type not in self.dataframes:
                 logger.error(f"Game type '{game_type}' not found in loaded dataframes")
-                return None
+                # Try reloading the specific CSV
+                self.load_csv(game_type, self.files[game_type])
+                if game_type not in self.dataframes:
+                    return None
 
             df = self.dataframes[game_type]
             if df is None or df.empty:
                 logger.error(f"Dataframe for {game_type} is empty or None")
-                return None
+                # Try reloading the specific CSV
+                self.load_csv(game_type, self.files[game_type])
+                df = self.dataframes[game_type]
+                if df is None or df.empty:
+                    return None
 
             column = df.columns[0]
             valid_values = df[column].dropna()
@@ -397,11 +405,19 @@ class GameReader:
                 logger.error(f"No valid values found in {game_type}")
                 return None
 
-            return random.choice(valid_values.tolist())
+            question = random.choice(valid_values.tolist())
+            logger.debug(f"Successfully retrieved question for {game_type}")
+            return question
 
         except Exception as e:
-            logger.error(f"Error getting random question for {game_type}: {str(e)}")
-            return None
+            logger.error(f"Error getting random question for {game_type}: {str(e)}", exc_info=True)
+            # Try reloading the specific CSV
+            try:
+                self.load_csv(game_type, self.files[game_type])
+                return self.get_random_question(game_type)  # Try once more
+            except Exception as reload_error:
+                logger.error(f"Failed to reload CSV for {game_type}: {str(reload_error)}")
+                return None
 
 # Initialize GameReader
 game_reader = GameReader()
