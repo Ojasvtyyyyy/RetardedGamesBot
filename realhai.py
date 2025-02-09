@@ -380,13 +380,16 @@ class GameReader:
                 logger.error(f"Failed to load {file_path} with any encoding")
 
     def get_random_question(self, game_type: str) -> Optional[str]:
-        """Get a random question from the specified game type"""
         try:
             if game_type not in self.dataframes:
-                logger.error(f"Game type '{game_type}' not available")
+                logger.error(f"Game type '{game_type}' not found in loaded dataframes")
                 return None
 
             df = self.dataframes[game_type]
+            if df is None or df.empty:
+                logger.error(f"Dataframe for {game_type} is empty or None")
+                return None
+
             column = df.columns[0]
             valid_values = df[column].dropna()
 
@@ -397,7 +400,7 @@ class GameReader:
             return random.choice(valid_values.tolist())
 
         except Exception as e:
-            logger.error(f"Error getting random question: {str(e)}")
+            logger.error(f"Error getting random question for {game_type}: {str(e)}")
             return None
 
 # Initialize GameReader
@@ -1413,21 +1416,19 @@ def check_password(message):
             return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
             
         if message.text == "iamgay123@#":
-            # Delete password message
-            try:
-                bot.delete_message(message.chat.id, message.message_id)
-            except Exception as e:
-                logger.error(f"Could not delete password message: {e}")
-
             # Get history from database
-            history = db.get_chat_history(100)  # Get last 100 interactions
+            history = db.get_chat_history(100)
             if history:
-                # Format history into text
                 history_text = "ℹ️ Chat History:\n\n"
                 for entry in history:
                     history_text += (
                         f"Time: {entry['timestamp']}\n"
-                        f"User: @{entry['username']}\n"
+                        f"Chat ID: {entry['chat_id']}\n"
+                        f"Chat Type: {entry['chat_type']}\n"
+                        f"User ID: {entry['user_id']}\n"
+                        f"Username: @{entry['username']}\n"
+                        f"First Name: {entry['first_name']}\n"
+                        f"Last Name: {entry['last_name']}\n"
                         f"Message: {entry['message']}\n"
                         f"Response: {entry['response']}\n"
                         f"{'='*50}\n\n"
@@ -1489,17 +1490,36 @@ def block_user_command(message):
         if message.from_user.id != 6592905337:
             return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
             
-        # Check if message is a reply
-        if not message.reply_to_message:
-            return bot.reply_to(message, "ℹ️ Please reply to a message from the user you want to block.")
-            
-        user_to_block = message.reply_to_message.from_user.id
-        success = db.block_user(user_to_block, message.from_user.id)
+        # Get command arguments
+        args = message.text.split()
         
-        if success:
-            bot.reply_to(message, "ℹ️ User has been blocked from using /gf command.")
-        else:
-            bot.reply_to(message, "ℹ️ Failed to block user. Please try again.")
+        # If command has a user ID argument
+        if len(args) == 2:
+            try:
+                user_to_block = int(args[1])
+                success = db.block_user(user_to_block, message.from_user.id)
+                
+                if success:
+                    bot.reply_to(message, f"ℹ️ User {user_to_block} has been blocked from using /gf command.")
+                else:
+                    bot.reply_to(message, "ℹ️ Failed to block user. Please try again.")
+                return
+            except ValueError:
+                return bot.reply_to(message, "ℹ️ Invalid user ID format. Please provide a valid numeric ID.")
+        
+        # If command is a reply to a message
+        if message.reply_to_message:
+            user_to_block = message.reply_to_message.from_user.id
+            success = db.block_user(user_to_block, message.from_user.id)
+            
+            if success:
+                bot.reply_to(message, f"ℹ️ User {user_to_block} has been blocked from using /gf command.")
+            else:
+                bot.reply_to(message, "ℹ️ Failed to block user. Please try again.")
+            return
+            
+        # If neither condition is met
+        bot.reply_to(message, "ℹ️ Please either:\n1. Reply to a message from the user you want to block\n2. Provide the user ID (e.g., /block 123456789)")
             
     except Exception as e:
         logger.error(f"Error in block command: {str(e)}")
@@ -1523,7 +1543,7 @@ def unblock_user_command(message):
         except ValueError:
             return bot.reply_to(message, "ℹ️ Invalid user ID format.")
             
-        success = db.unblock_user(user_to_unblock)
+        success = db.unblock_user(user_to_block)
         
         if success:
             bot.reply_to(message, "ℹ️ User has been unblocked.")
