@@ -285,16 +285,17 @@ def get_user_name(message):
     return message.from_user.first_name or message.from_user.username or "baby"
 
 def create_bot_session():
+    """Create a session with retry logic"""
     session = requests.Session()
-    retry = Retry(
-        total=5,
-        backoff_factor=0.5,
-        status_forcelist=[500, 502, 503, 504],
-        allowed_methods=frozenset(['GET', 'POST'])
+    retry_strategy = Retry(
+        total=5,  # number of retries
+        backoff_factor=0.5,  # wait time between retries
+        status_forcelist=[500, 502, 503, 504, 429],  # status codes to retry on
+        allowed_methods=["GET", "POST"],  # methods to retry
     )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
     return session
 
 # Initialize bot with custom session
@@ -1430,7 +1431,7 @@ def get_chat_mode(chat_id: int) -> str:
     return chat_modes[chat_id]['mode']
 
 # Add this general message handler for commands
-@bot.message_handler(func=lambda message: True)
+@safe_request
 def handle_all_messages(message):
     """Handle all incoming messages"""
     try:
@@ -1439,11 +1440,22 @@ def handle_all_messages(message):
             return
 
         # If it's a reply to bot, handle it
-        if message.reply_to_message and message.reply_to_message.from_user.id == bot.get_me().id:
-            handle_all_replies(message)
+        try:
+            if (message.reply_to_message and 
+                message.reply_to_message.from_user and 
+                message.reply_to_message.from_user.id == bot.get_me().id):
+                handle_all_replies(message)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error in handle_all_messages: {str(e)}")
+            bot.reply_to(message, "Sorry, I'm having connection issues. Please try again in a moment.")
+            return
 
     except Exception as e:
-        logger.error(f"Error in handle_all_messages: {str(e)}", exc_info=True)
+        logger.error(f"Error in handle_all_messages: {str(e)}")
+        try:
+            bot.reply_to(message, "Sorry, something went wrong. Please try again.")
+        except:
+            logger.error("Failed to send error message to user")
 
 def log_interaction(message, response=None):
     """Log user interactions to database"""
@@ -1557,7 +1569,7 @@ def register_handlers():
     logger.info("Message handlers registered successfully")
 
 # Add these command handlers after other command handlers in register_handlers()
-@bot.message_handler(commands=['block'])
+@safe_request
 def block_user_command(message):
     """Handle the /block command"""
     try:
@@ -1600,7 +1612,7 @@ def block_user_command(message):
         logger.error(f"Error in block command: {str(e)}")
         bot.reply_to(message, "ℹ️ An error occurred while blocking the user.")
 
-@bot.message_handler(commands=['unblock'])
+@safe_request
 def unblock_user_command(message):
     """Handle the /unblock command"""
     try:
