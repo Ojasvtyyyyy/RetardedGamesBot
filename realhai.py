@@ -419,6 +419,18 @@ class GameReader:
                 logger.error(f"Failed to reload CSV for {game_type}: {str(reload_error)}")
                 return None
 
+    def reload_csv(self, game_type):
+        """Reload a specific CSV file"""
+        try:
+            if game_type in self.files:
+                logger.info(f"Reloading {game_type} from {self.files[game_type]}")
+                self.load_csv(game_type, self.files[game_type])
+                logger.info(f"Successfully reloaded {game_type} with {len(self.dataframes.get(game_type, []))} questions")
+                return True
+        except Exception as e:
+            logger.error(f"Error reloading {game_type}: {str(e)}")
+            return False
+
 # Initialize GameReader
 game_reader = GameReader()
 
@@ -536,6 +548,9 @@ def create_game_handler(game_type, emoji):
                 if '@' in message.text and not message.text.endswith(f'@{bot.get_me().username}'):
                     return
 
+            # Reload the CSV before getting a question
+            game_reader.reload_csv(game_type)
+            
             question = game_reader.get_random_question(game_type)
             if question:
                 bot.reply_to(message, f"{emoji} {question}")
@@ -679,6 +694,10 @@ def get_emoji_for_game(game_type):
 def send_stats(message):
     """Handle the /stats command"""
     try:
+        # Reload all CSVs before showing stats
+        for game_type in game_reader.files.keys():
+            game_reader.reload_csv(game_type)
+            
         stats_text = (
             "📊 Bot Statistics\n\n"
             f"Total Questions:\n"
