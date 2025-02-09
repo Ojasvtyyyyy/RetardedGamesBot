@@ -580,16 +580,18 @@ def create_game_handler(game_type, emoji):
     def handler(message):
         try:
             chat_id = message.chat.id
+            logger.debug(f"Game command received in chat {chat_id}")
 
             # Always switch to game mode and end conversations, regardless of current state
             set_chat_mode(chat_id, GAME_MODE)
             if chat_id in active_conversations:
+                logger.debug(f"Ending active conversation in chat {chat_id}")
                 del active_conversations[chat_id]
 
             # Clear any pending next step handlers
             bot.clear_step_handler_by_chat_id(chat_id)
 
-            # Rest of the existing game handler code...
+            # Rest of the game handler code...
             if message.chat.type in ['group', 'supergroup']:
                 command = message.text.split('@')[0][1:]
                 if '@' in message.text and not message.text.endswith(f'@{bot.get_me().username}'):
