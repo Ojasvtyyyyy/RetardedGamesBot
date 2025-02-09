@@ -1065,22 +1065,13 @@ def handle_game_commands(message):
         user_id = message.from_user.id
         logger.debug(f"Game command received in chat {chat_id}")
 
-        # Check if there's an active conversation with a different user
-        if chat_id in active_conversations and active_conversations[chat_id]['user_id'] != user_id:
-            logger.debug(f"Different user {user_id} trying to start game while conversation active")
-            bot.reply_to(
-                message,
-                "Sorry! I'm currently in a conversation with someone else! 🥺\n"
-                "Please wait for them to finish or start your own chat with /gf command! 💕"
-            )
-            return
-
         # Set game command and end any active conversation
         command = message.text.split('@')[0][1:]  # Remove bot username if present
         last_command[chat_id] = command
 
+        # Always end active conversations when game commands are used
         if chat_id in active_conversations:
-            logger.debug(f"Ending active conversation for user {user_id}")
+            logger.debug(f"Ending active conversation in chat {chat_id}")
             del active_conversations[chat_id]
             # Clear any pending next step handlers
             bot.clear_step_handler_by_chat_id(chat_id)
