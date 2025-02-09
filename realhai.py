@@ -189,6 +189,26 @@ By clicking "I Agree," you confirm that:
 ✔️ You understand that this is an AI bot, not a human.
 """
 
+# Add this near the top of the file, after imports and before class definitions
+def safe_request(func):
+    """Decorator for safe API requests"""
+    def wrapper(*args, **kwargs):
+        max_retries = 3
+        retry_delay = 1
+        
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except (requests.exceptions.ConnectionError, 
+                    requests.exceptions.Timeout,
+                    requests.exceptions.RequestException) as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Failed after {max_retries} attempts: {str(e)}")
+                    raise
+                logger.warning(f"Request failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                time.sleep(retry_delay * (attempt + 1))
+    return wrapper
+
 # Helper Functions
 def create_agreement_keyboard():
     """Create keyboard with agree/disagree buttons"""
