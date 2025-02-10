@@ -22,6 +22,7 @@ from database import db
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from flask import Flask, request, jsonify
 
 # Load environment variables
 load_dotenv()
@@ -517,13 +518,13 @@ def send_welcome(message):
             "🔞 /nsfwwyr - NSFW Would You Rather\n"
             "🚩 /redgreenflag - Red flag or Green flag?\n"
             "😈 /evilornot - Evil or Not?\n"
-            "💘 /fmk - Fuck, Marry, Kill\n"
+            "💘 /fmk - Slap, Marry, Kiss\n"
             "💝 /gf - Chat with your clingy girlfriend\n"
             "🎲 /random - Get a random question\n"
             "📊 /stats - See question statistics\n"
             "📝 /register - Register for FMK group chat game\n"
             "🚫 /remove - Remove yourself from FMK game\n"
-            "👥 /fmkgc - Play FMK with group members\n"
+            "👥 /fmkgc - Play SMK with group members\n"
             "ℹ️ /help - Show detailed help\n"
             "❓ /about - About this bot\n\n"
             "Created by @RetardedGamesBotDevBot"
@@ -547,7 +548,7 @@ def send_help(message):
             "🔞 /nsfwwyr - NSFW Would You Rather\n"
             "🚩 /redgreenflag - Red flag or Green flag?\n"
             "😈 /evilornot - Evil or Not?\n"
-            "💘 /fmk - Fuck, Marry, Kill\n"
+            "💘 /fmk - Slap, Marry, Kiss\n"
             "💝 /gf - Chat with your clingy girlfriend\n"
             "💖 /girlfriend - Same as /gf\n"
             "💕 /bae - Another way to start chat\n"
@@ -556,7 +557,7 @@ def send_help(message):
             "📊 /stats - See question statistics\n"
             "📝 /register - Register for FMK group chat game\n"
             "🚫 /remove - Remove yourself from FMK game\n"
-            "👥 /fmkgc - Play FMK with group members\n\n"
+            "👥 /fmkgc - Play SMK with group members\n\n"
             "For girlfriend chat:\n"
             "• Reply to continue conversation\n"
             "• Be sweet, she's emotional 🥺\n"
@@ -683,7 +684,7 @@ def remove_from_fmk(message):
 
 @bot.message_handler(commands=['fmkgc'])
 def fmk_group_chat(message):
-    """Play FMK with group chat members"""
+    """Play SMK with group chat members"""
     try:
         if message.chat.type not in ['group', 'supergroup']:
             return bot.reply_to(message, "📝 This command only works in group chats!")
@@ -694,7 +695,7 @@ def fmk_group_chat(message):
         if len(registered_users) < 3:
             return bot.reply_to(
                 message,
-                "⚠️ Not enough players registered for FMK!\n"
+                "⚠️ Not enough players registered for SMK!\n"
                 "Need at least 3 players.\n"
                 "Use /register to join the game! 📝")
 
@@ -711,8 +712,8 @@ def fmk_group_chat(message):
             except:
                 user_names.append(f"User{user_id}")
 
-        fmk_text = f"💘 F*ck, Marry, Kill:\n\n👥 {', '.join(user_names)}"
-        bot.reply_to(message, fmk_text)
+        smk_text = f"💘 Slap, Marry, Kiss:\n\n👥 {', '.join(user_names)}"
+        bot.reply_to(message, smk_text)
 
     except Exception as e:
         logger.error(f"Error in fmkgc command: {str(e)}")
@@ -801,15 +802,15 @@ def is_game_response(message_text: str) -> bool:
         "Would you sign this petition:",
         "Red flag or Green flag:",
         "Evil or Not:",
-        "F*ck, Marry, Kill:",
-        "Fuck, Marry, Kill:",
+        "Slap, Marry, Kiss:",
+        "Slap, Marry, Kiss:",
         # Add more specific patterns from your game responses
         "Choose between:",
         "What would you do:",
         "Rate this:",
         # Add to existing patterns
-        "💘 F*ck, Marry, Kill:",
-        "👥 F*ck, Marry, Kill:",
+        "💘 Slap, Marry, Kiss:",
+        "👥 Slap, Marry, Kiss:",
         # Add FMK group chat patterns
         "📝 This command only works in group chats!",
         "💫", "you're already registered for FMK!",
@@ -819,8 +820,8 @@ def is_game_response(message_text: str) -> bool:
         "⚠️ Not enough players registered for FMK!",
         "Need at least 3 players.",
         "Use /register to join the game! 📝",
-        "💘 F*ck, Marry, Kill:",
-        "👥 F*ck, Marry, Kill:",
+        "💘 Slap, Marry, Kiss:",
+        "👥 Slap, Marry, Kiss:",
         # Common error messages for all games
         "Baby, kuch problem ho gayi. Thodi der baad try karo 🥺",
         "Sweetuu, question nahi mil raha. Ek aur baar try karo? 💕",
@@ -903,7 +904,7 @@ def get_gemini_response(prompt, context_key=None):
     enhanced_prompt = (
         f"You are a sweet and caring Indian girlfriend. Keep responses short, natural and casual. "
         "Mix Hindi (written in English letters) with English naturally, like Indians text each other. "
-        "Use common Hindi words."
+        "Use common Hindi words. Use punctuations rarely like humans do."
         "Never use emojis. Use emoctions instead "
         "Be caring but not overly dramatic. Talk like a real young Indian girl would text. "
         "Keep messages short - usually 1-3 lines max. "
@@ -1409,7 +1410,7 @@ def setup_commands():
             telebot.types.BotCommand("nsfwwyr", "🔞 NSFW Would You Rather"),
             telebot.types.BotCommand("redgreenflag", "🚩 Red flag or Green flag?"),
             telebot.types.BotCommand("evilornot", "😈 Evil or Not?"),
-            telebot.types.BotCommand("fmk", "💘 Fuck, Marry, Kill"),
+            telebot.types.BotCommand("fmk", "💘 Slap, Marry, Kiss"),
             telebot.types.BotCommand("gf", "💝 Chat with your clingy girlfriend"),
             telebot.types.BotCommand("random", "🎲 Get a random question"),
             telebot.types.BotCommand("stats", "📊 See question statistics"),
@@ -1417,7 +1418,7 @@ def setup_commands():
             telebot.types.BotCommand("about", "❓ About this bot"),
             telebot.types.BotCommand("register", "📝 Register for FMK group chat game"),
             telebot.types.BotCommand("remove", "🚫 Remove yourself from FMK game"),
-            telebot.types.BotCommand("fmkgc", "👥 Play FMK with group members"),
+            telebot.types.BotCommand("fmkgc", "👥 Play SMK with group members"),
             telebot.types.BotCommand("history", "📜 View chat history (Admin only)")
         ]
 
@@ -1696,26 +1697,81 @@ if __name__ == "__main__":
             bot.set_webhook(url=f"{webhook_url}/webhook")
             
             # Start Flask server
-            from flask import Flask, request
             app = Flask(__name__)
             
+            # Add these configurations to your Flask app
+            app.config.update(
+                PREFERRED_URL_SCHEME='https',
+                PROPAGATE_EXCEPTIONS=True,
+                MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max-limit
+                PERMANENT_SESSION_LIFETIME=timedelta(minutes=30)
+            )
+
+            # Add error handlers
+            @app.errorhandler(500)
+            def handle_500_error(e):
+                logger.error(f"Internal server error: {str(e)}")
+                return 'Internal server error', 500
+
+            @app.errorhandler(502)
+            def handle_502_error(e):
+                logger.error(f"Bad gateway error: {str(e)}")
+                return 'Server is starting up, please try again', 502
+
+            @app.errorhandler(Exception)
+            def handle_exception(e):
+                logger.error(f"Unhandled exception: {str(e)}")
+                return 'An unexpected error occurred', 500
+
+            # Add health check endpoint
+            @app.route('/health')
+            def health_check():
+                try:
+                    # Test database connection
+                    if not db.ensure_connection():
+                        return 'Database connection failed', 500
+                        
+                    # Test bot API
+                    bot.get_me()
+                    
+                    return jsonify({
+                        'status': 'healthy',
+                        'timestamp': datetime.now().isoformat(),
+                        'database': 'connected',
+                        'bot': 'active'
+                    }), 200
+                    
+                except Exception as e:
+                    logger.error(f"Health check failed: {str(e)}")
+                    return jsonify({
+                        'status': 'unhealthy',
+                        'error': str(e),
+                        'timestamp': datetime.now().isoformat()
+                    }), 500
+
+            # Modify the webhook route
             @app.route('/webhook', methods=['POST'])
             def webhook():
                 if request.headers.get('content-type') == 'application/json':
-                    json_string = request.get_data().decode('utf-8')
-                    update = telebot.types.Update.de_json(json_string)
-                    bot.process_new_updates([update])
-                    return ''
+                    try:
+                        json_string = request.get_data().decode('utf-8')
+                        update = telebot.types.Update.de_json(json_string)
+                        bot.process_new_updates([update])
+                        return '', 200
+                    except Exception as e:
+                        logger.error(f"Error processing webhook: {str(e)}")
+                        return 'Error processing update', 500
                 else:
-                    return 'error', 403
+                    return 'Invalid content type', 403
                     
-            # Add this new health check endpoint
-            @app.route('/')  # Root URL
-            def health_check():
-                return 'Bot is running!', 200
-
-            # Start server
-            app.run(host='0.0.0.0', port=port)
+            # Modify the app.run call
+            app.run(
+                host='0.0.0.0',
+                port=port,
+                threaded=True,
+                request_timeout=120,
+                use_reloader=False
+            )
             
         else:
             # If no webhook URL, use polling (for local development)
