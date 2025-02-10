@@ -16,42 +16,82 @@ class Database:
         self.client = None
         self.db = None
         self.connect()
+        # Add reconnection timer
+        self.last_reconnect_attempt = 0
+        self.reconnect_cooldown = 60  # seconds
 
     def connect(self):
-        """Connect to MongoDB with retry logic"""
+        """Connect to MongoDB with improved retry logic"""
         try:
+            # Check cooldown period
+            current_time = time.time()
+            if current_time - self.last_reconnect_attempt < self.reconnect_cooldown:
+                logger.debug("Skipping reconnect attempt due to cooldown")
+                return False
+                
+            self.last_reconnect_attempt = current_time
             mongodb_uri = os.environ.get('MONGODB_URI')
             if not mongodb_uri:
                 raise ValueError("MONGODB_URI environment variable not set")
             
-            # Add retry logic for connection
-            max_retries = 3
+            # Increased timeouts and better retry settings
+            max_retries = 5
             retry_count = 0
             while retry_count < max_retries:
                 try:
-                    self.client = MongoClient(mongodb_uri, 
-                                           serverSelectionTimeoutMS=5000,
-                                           connectTimeoutMS=5000)
+                    self.client = MongoClient(mongodb_uri,
+                                           serverSelectionTimeoutMS=20000,  # Increased timeout
+                                           connectTimeoutMS=20000,         # Increased timeout
+                                           socketTimeoutMS=20000,          # Increased timeout
+                                           maxPoolSize=10,                 # Reduced pool size
+                                           minPoolSize=1,                  # Keep minimum connection
+                                           maxIdleTimeMS=45000,           # Close idle connections after 45s
+                                           retryWrites=True,
+                                           retryReads=True,               # Added retry reads
+                                           w='majority',                  # Write concern
+                                           waitQueueTimeoutMS=10000)      # Queue timeout
+                    
                     # Test the connection
                     self.client.admin.command('ping')
                     self.db = self.client.telegram_bot
                     logger.info("Successfully connected to MongoDB")
-                    return
+                    return True
+                    
                 except Exception as e:
                     retry_count += 1
                     if retry_count == max_retries:
                         raise
+                    wait_time = min(2 ** retry_count, 30)  # Cap max wait at 30 seconds
                     logger.warning(f"MongoDB connection attempt {retry_count} failed: {str(e)}")
-                    time.sleep(2)  # Wait before retrying
+                    logger.warning(f"Waiting {wait_time} seconds before retry")
+                    time.sleep(wait_time)
                     
         except Exception as e:
             logger.error(f"Error connecting to MongoDB: {str(e)}")
-            # Initialize with empty/mock database for graceful degradation
             self.client = None
             self.db = None
+            return False
+
+    def ensure_connection(self):
+        """Ensure database connection is active"""
+        try:
+            if self.db is None:
+                return self.connect()
+            
+            # Test existing connection
+            self.client.admin.command('ping')
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Database connection lost: {str(e)}")
+            return self.connect()
 
     # FMK Players Management
     def add_fmk_player(self, chat_id: int, user_id: int, user_name: str):
+        if not self.ensure_connection():
+            logger.error("Database connection failed")
+            return False
+            
         try:
             collection = self.db.fmk_players
             result = collection.update_one(
