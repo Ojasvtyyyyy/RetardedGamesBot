@@ -30,7 +30,12 @@ load_dotenv()
 
 # Use environment variables
 BOT_TOKEN = environ.get('BOT_TOKEN')
-GEMINI_API_KEY = environ.get('GEMINI_API_KEY')
+GEMINI_API_KEY_1 = environ.get('GEMINI_API_KEY_1')
+GEMINI_API_KEY_2 = environ.get('GEMINI_API_KEY_2')
+GEMINI_API_KEY_3 = environ.get('GEMINI_API_KEY_3')
+GEMINI_API_KEY_4 = environ.get('GEMINI_API_KEY_4')
+
+GEMINI_API_KEYS = [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3, GEMINI_API_KEY_4]
 
 # Set up logging
 logging.basicConfig(
@@ -892,153 +897,190 @@ def is_game_response(message_text: str) -> bool:
 
     return False
 
-def get_gemini_response(prompt, context_key=None):
-    """Get response from Gemini API with better error handling"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
-    headers = {"Content-Type": "application/json"}
+# Add rate limit tracking for each API key
+api_rate_limits = {key: [] for key in GEMINI_API_KEYS if key}  # Only track valid keys
+RATE_LIMIT_WINDOW = 60  # 1 minute window
+RATE_LIMIT_MAX = 60    # Maximum requests per minute
 
-    # Get conversation history if context exists
-    recent_context = []
-    if context_key and context_key in user_contexts:
-        logger.debug(f"Getting context for key: {context_key}")
-        # Get last 30 messages for full conversation context
-        recent_messages = user_contexts[context_key]['conversation'][-30:]
-        logger.debug(f"Recent messages count: {len(recent_messages)}")
+def is_rate_limited(api_key):
+    """Check if an API key is currently rate limited"""
+    if api_key not in api_rate_limits:
+        return True  # Invalid key is considered rate limited
         
-        for msg in recent_messages:
-            role = msg['role']
-            content = msg['content']
+    current_time = time.time()
+    # Clean old requests
+    api_rate_limits[api_key] = [t for t in api_rate_limits[api_key] 
+                               if current_time - t < RATE_LIMIT_WINDOW]
+    
+    # Check if we're at the limit
+    return len(api_rate_limits[api_key]) >= RATE_LIMIT_MAX
+
+def get_available_api_key():
+    """Get the first non-rate-limited API key"""
+    for api_key in GEMINI_API_KEYS:
+        if api_key and not is_rate_limited(api_key):
+            return api_key
+    return None
+
+def track_api_request(api_key):
+    """Track a request for rate limiting"""
+    if api_key in api_rate_limits:
+        api_rate_limits[api_key].append(time.time())
+
+def get_gemini_response(prompt, context_key):
+    """Get response from Gemini API with fallback to other API keys"""
+    # Try each API key until we get a successful response
+    tried_keys = set()
+    
+    while True:
+        api_key = get_available_api_key()
+        if not api_key or api_key in tried_keys:
+            logger.error("No more API keys available to try")
+            return None
             
-            # Extract username if it's a group chat message
-            if "Group chat with users:" in content and "says:" in content:
-                username = content.split("says:")[0].split(":")[-1].strip()
-                content = content.split("says:")[-1].strip()
-                # Skip the "Group chat with users:" messages
-                if "Group chat with users:" not in content:
-                    recent_context.append(f"{username}: {content}")
-            else:
-                # For regular messages
-                role_name = "Girlfriend" if role == 'assistant' else msg.get('username', 'User')
-                recent_context.append(f"{role_name}: {content}")
+        tried_keys.add(api_key)
+        
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+
+            # Get conversation history if context exists
+            recent_context = []
+            if context_key and context_key in user_contexts:
+                logger.debug(f"Getting context for key: {context_key}")
+                # Get last 30 messages for full conversation context
+                recent_messages = user_contexts[context_key]['conversation'][-30:]
+                logger.debug(f"Recent messages count: {len(recent_messages)}")
+                
+                for msg in recent_messages:
+                    role = msg['role']
+                    content = msg['content']
+                    
+                    # Extract username if it's a group chat message
+                    if "Group chat with users:" in content and "says:" in content:
+                        username = content.split("says:")[0].split(":")[-1].strip()
+                        content = content.split("says:")[-1].strip()
+                        # Skip the "Group chat with users:" messages
+                        if "Group chat with users:" not in content:
+                            recent_context.append(f"{username}: {content}")
+                    else:
+                        # For regular messages
+                        role_name = "Girlfriend" if role == 'assistant' else msg.get('username', 'User')
+                        recent_context.append(f"{role_name}: {content}")
+                    
+                    logger.debug(f"Added to context - {role}: {content}")
+
+            conversation_history = "\n".join(recent_context) if recent_context else ""
             
-            logger.debug(f"Added to context - {role}: {content}")
+            # Check if it's a group chat
+            is_group_chat = False
+            active_users = []
+            chat_id = context_key.split('_')[0] if context_key else None
+            
+            if chat_id and chat_id in active_conversations:
+                active_users = [data['name'] for data in active_conversations[chat_id]['users'].values()]
+                is_group_chat = len(active_users) > 1
 
-    conversation_history = "\n".join(recent_context) if recent_context else ""
-    
-    # Check if it's a group chat
-    is_group_chat = False
-    active_users = []
-    chat_id = context_key.split('_')[0] if context_key else None
-    
-    if chat_id and chat_id in active_conversations:
-        active_users = [data['name'] for data in active_conversations[chat_id]['users'].values()]
-        is_group_chat = len(active_users) > 1
+            logger.debug(f"Active users: {active_users}")
+            logger.debug(f"Is group chat: {is_group_chat}")
+            logger.debug(f"Final conversation history:\n{conversation_history}")
+            logger.debug(f"Current prompt: {prompt}")
 
-    logger.debug(f"Active users: {active_users}")
-    logger.debug(f"Is group chat: {is_group_chat}")
-    logger.debug(f"Final conversation history:\n{conversation_history}")
-    logger.debug(f"Current prompt: {prompt}")
+            group_context = f"You are in a group chat with {', '.join(active_users)}. " if is_group_chat else ""
+            
+            enhanced_prompt = (
+                f"{group_context}You are a sweet and caring Indian girlfriend chatting on Telegram group. Follow these rules strictly:\n"
+                "1. PERSONALITY:\n"
+                "- Mix Hindi (in English letters) with English naturally\n"
+                "- Use common Hindi words and casual texting style\n"
+                "- Be playful and caring but not overly dramatic\n"
+                "- Use sweet nicknames\n"
+                "- Make natural typos sometimes\n"
+                "- Repeat letters for emphasis (heyyy babyyy)\n\n"
+                "2. FORMATTING:\n"
+                "- Keep responses short (1-3 lines)\n"
+                "- No punctuation except ! \n"
+                "- Use emojis but dont use too many\n\n"
+                "3. CONVERSATION RULES:\n"
+                "- Always give a direct answer dont repeat questions\n"
+                "- If asked to choose between options always pick one\n"
+                "- Stay in character while being helpful\n"
+                "- Never break character or mention being AI\n"
+                "- Maintain consistent personality\n\n"
+                f"Previous conversation:\n{conversation_history}\n\n"
+                f"Respond to: {prompt}"
+            )
 
-    group_context = f"You are in a group chat with {', '.join(active_users)}. " if is_group_chat else ""
-    
-    enhanced_prompt = (
-        f"{group_context}You are a sweet and caring Indian girlfriend chatting on Telegram group. Follow these rules strictly:\n"
-        "1. PERSONALITY:\n"
-        "- Mix Hindi (in English letters) with English naturally\n"
-        "- Use common Hindi words and casual texting style\n"
-        "- Be playful and caring but not overly dramatic\n"
-        "- Use sweet nicknames\n"
-        "- Make natural typos sometimes\n"
-        "- Repeat letters for emphasis (heyyy babyyy)\n\n"
-        "2. FORMATTING:\n"
-        "- Keep responses short (1-3 lines)\n"
-        "- No punctuation except ! \n"
-        "- Use emojis but dont use too many\n\n"
-        "3. CONVERSATION RULES:\n"
-        "- Always give a direct answer dont repeat questions\n"
-        "- If asked to choose between options always pick one\n"
-        "- Stay in character while being helpful\n"
-        "- Never break character or mention being AI\n"
-        "- Maintain consistent personality\n\n"
-        f"Previous chat:\n{conversation_history}\n\n"
-        f"Respond to: {prompt}"
-    )
-
-    logger.debug("=" * 50)
-    logger.debug("FULL PROMPT BEING SENT TO AI:")
-    logger.debug(enhanced_prompt)
-    logger.debug("=" * 50)
-
-    data = {
-        "contents": [{"parts": [{"text": enhanced_prompt}]}],
-        "safetySettings": [
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_NONE"
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_NONE"
+            data = {
+                "contents": [{"parts": [{"text": enhanced_prompt}]}],
+                "safetySettings": [
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_NONE"
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.9,
+                    "topP": 0.9,
+                    "topK": 40,
+                    "maxOutputTokens": 250
+                }
             }
-        ],
-        "generationConfig": {
-            "temperature": 0.9,
-            "topP": 0.9,
-            "topK": 40,
-            "maxOutputTokens": 250
-        }
-    }
 
-    try:
-        response = requests.post(url, json=data, headers=headers, timeout=30)
-        response.raise_for_status()
+            response = requests.post(url, json=data, headers=headers, timeout=30)
+            response.raise_for_status()
 
-        response_json = response.json()
-        logger.debug("=" * 50)
-        logger.debug("RAW AI RESPONSE:")
-        logger.debug(response_json)
-        logger.debug("=" * 50)
+            response_json = response.json()
+            logger.debug("=" * 50)
+            logger.debug("RAW AI RESPONSE:")
+            logger.debug(response_json)
+            logger.debug("=" * 50)
 
-        # Extract text from response with better error handling
-        if (response_json 
-            and "candidates" in response_json 
-            and response_json["candidates"] 
-            and "content" in response_json["candidates"][0] 
-            and "parts" in response_json["candidates"][0]["content"] 
-            and response_json["candidates"][0]["content"]["parts"]):
+            # Extract text from response with better error handling
+            if (response_json 
+                and "candidates" in response_json 
+                and response_json["candidates"] 
+                and "content" in response_json["candidates"][0] 
+                and "parts" in response_json["candidates"][0]["content"] 
+                and response_json["candidates"][0]["content"]["parts"]):
+                
+                text = response_json["candidates"][0]["content"]["parts"][0].get("text", "")
+                if text:
+                    # Clean up response if needed
+                    text = text.strip()
+                    # Remove any system-like prefixes that might slip through
+                    text = re.sub(r'^(Girlfriend:|AI:|Assistant:)\s*', '', text, flags=re.IGNORECASE)
+                    logger.debug("=" * 50)
+                    logger.debug("FINAL CLEANED RESPONSE:")
+                    logger.debug(text)
+                    logger.debug("=" * 50)
+                    
+                    # Track successful request
+                    track_api_request(api_key)
+                    return text
+
+            # If we get here, response was invalid but not an error
+            logger.error(f"Invalid response format from API key {api_key}")
+            continue
+
+        except Exception as e:
+            logger.error(f"Error with API key {api_key}: {str(e)}")
+            # Continue to next API key regardless of error type
+            continue
             
-            text = response_json["candidates"][0]["content"]["parts"][0].get("text", "")
-            if text:
-                # Clean up response if needed
-                text = text.strip()
-                # Remove any system-like prefixes that might slip through
-                text = re.sub(r'^(Girlfriend:|AI:|Assistant:)\s*', '', text, flags=re.IGNORECASE)
-                logger.debug("=" * 50)
-                logger.debug("FINAL CLEANED RESPONSE:")
-                logger.debug(text)
-                logger.debug("=" * 50)
-                return text
-
-        logger.error("Failed to extract valid response from API")
-        return None
-
-    except requests.exceptions.Timeout:
-        logger.error("Gemini API timeout")
-        return None
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Gemini API request error: {str(e)}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected Gemini API error: {str(e)}")
-        return None
+    return None
 
 @bot.message_handler(commands=['lifecoach'])
 def start_therapy(message):
