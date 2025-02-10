@@ -901,8 +901,8 @@ def get_gemini_response(prompt, context_key=None):
     recent_context = []
     if context_key and context_key in user_contexts:
         logger.debug(f"Getting context for key: {context_key}")
-        # Get last 12 messages but maintain conversation flow
-        recent_messages = user_contexts[context_key]['conversation'][-12:]
+        # Get last 30 messages for full conversation context
+        recent_messages = user_contexts[context_key]['conversation'][-30:]
         logger.debug(f"Recent messages count: {len(recent_messages)}")
         
         for msg in recent_messages:
@@ -913,7 +913,9 @@ def get_gemini_response(prompt, context_key=None):
             if "Group chat with users:" in content and "says:" in content:
                 username = content.split("says:")[0].split(":")[-1].strip()
                 content = content.split("says:")[-1].strip()
-                recent_context.append(f"{username}: {content}")
+                # Skip the "Group chat with users:" messages
+                if "Group chat with users:" not in content:
+                    recent_context.append(f"{username}: {content}")
             else:
                 # For regular messages
                 role_name = "Girlfriend" if role == 'assistant' else msg.get('username', 'User')
@@ -951,7 +953,7 @@ def get_gemini_response(prompt, context_key=None):
         "2. FORMATTING:\n"
         "- Keep responses short (1-3 lines)\n"
         "- No punctuation except ! \n"
-        "- No emojis use text emotions\n\n"
+        "- Use emojis but dont use too many\n\n"
         "3. CONVERSATION RULES:\n"
         "- Always give a direct answer dont repeat questions\n"
         "- If asked to choose between options always pick one\n"
