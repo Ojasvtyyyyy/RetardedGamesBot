@@ -291,5 +291,137 @@ class Database:
             logger.error(f"Error checking FMK registration: {str(e)}")
             return False
 
+    # Chat Participant Management
+    def add_chat_participant(self, chat_id: int, user_id: int, user_name: str):
+        """Add participant to active chat (up to 3 users)"""
+        try:
+            if self.db is None:
+                return False
+            
+            collection = self.db.active_chats
+            
+            # Check current participants count
+            chat = collection.find_one({"chat_id": chat_id})
+            if chat and len(chat.get('participants', [])) >= 3:
+                return False, "Chat is full (max 3 users)"
+            
+            # Add new participant
+            result = collection.update_one(
+                {"chat_id": chat_id},
+                {
+                    "$addToSet": {
+                        "participants": {
+                            "user_id": user_id,
+                            "user_name": user_name,
+                            "joined_at": datetime.now()
+                        }
+                    }
+                },
+                upsert=True
+            )
+            return True, None
+        except Exception as e:
+            logger.error(f"Error adding chat participant: {str(e)}")
+            return False, str(e)
+
+    def remove_chat_participant(self, chat_id: int, user_id: int):
+        """Remove participant from active chat"""
+        try:
+            if self.db is None:
+                return False
+            
+            collection = self.db.active_chats
+            result = collection.update_one(
+                {"chat_id": chat_id},
+                {
+                    "$pull": {
+                        "participants": {
+                            "user_id": user_id
+                        }
+                    }
+                }
+            )
+            
+            # If no participants left, remove chat
+            chat = collection.find_one({"chat_id": chat_id})
+            if chat and len(chat.get('participants', [])) == 0:
+                collection.delete_one({"chat_id": chat_id})
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error removing chat participant: {str(e)}")
+            return False
+
+    def get_chat_participants(self, chat_id: int):
+        """Get list of participants in a chat"""
+        try:
+            if self.db is None:
+                return []
+            
+            collection = self.db.active_chats
+            chat = collection.find_one({"chat_id": chat_id})
+            return chat.get('participants', []) if chat else []
+        except Exception as e:
+            logger.error(f"Error getting chat participants: {str(e)}")
+            return []
+
+    def store_user_context(self, chat_id: int, user_id: int, context: str):
+        """Store user's last message context"""
+        try:
+            if self.db is None:
+                return False
+            
+            collection = self.db.user_contexts
+            result = collection.update_one(
+                {"chat_id": chat_id, "user_id": user_id},
+                {
+                    "$set": {
+                        "context": context,
+                        "updated_at": datetime.now()
+                    }
+                },
+                upsert=True
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error storing user context: {str(e)}")
+            return False
+
+    def get_user_context(self, chat_id: int, user_id: int):
+        """Get user's last message context"""
+        try:
+            if self.db is None:
+                return None
+            
+            collection = self.db.user_contexts
+            result = collection.find_one({"chat_id": chat_id, "user_id": user_id})
+            return result.get('context') if result else None
+        except Exception as e:
+            logger.error(f"Error getting user context: {str(e)}")
+            return None
+
+    def get_chat_history_for_prompt(self, chat_id: int, limit: int = 10):
+        """Get formatted chat history for AI prompt"""
+        try:
+            if self.db is None:
+                return ""
+            
+            collection = self.db.chat_history
+            history = collection.find(
+                {"chat_id": chat_id}
+            ).sort("timestamp", -1).limit(limit)
+            
+            formatted_history = []
+            for msg in reversed(list(history)):
+                user_name = msg.get('first_name') or msg.get('username') or f"User{msg['user_id']}"
+                formatted_history.append(f"{user_name}: {msg['message']}")
+                if msg.get('response'):
+                    formatted_history.append(f"AI: {msg['response']}")
+                
+            return "\n".join(formatted_history)
+        except Exception as e:
+            logger.error(f"Error getting chat history for prompt: {str(e)}")
+            return ""
+
 # Create a singleton instance
 db = Database()
