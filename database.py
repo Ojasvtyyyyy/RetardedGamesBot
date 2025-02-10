@@ -21,8 +21,6 @@ class Database:
         self.client = None
         self.db = None
         self.connect()
-        self.active_group_chats = {}  # Format: {chat_id: {'users': {user_id: username}, 'last_activity': datetime}}
-        self.max_users_per_chat = 3
 
     def connect(self):
         """Connect to MongoDB with improved retry logic"""
@@ -292,113 +290,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error checking FMK registration: {str(e)}")
             return False
-
-    def add_user_to_group_chat(self, chat_id: int, user_id: int, username: str):
-        """Add user to group chat if space available"""
-        try:
-            current_time = datetime.now()
-            
-            # Initialize chat if not exists
-            if chat_id not in self.active_group_chats:
-                self.active_group_chats[chat_id] = {
-                    'users': {},
-                    'last_activity': current_time
-                }
-            
-            chat_data = self.active_group_chats[chat_id]
-            
-            # Clean inactive users (optional, 30 minutes timeout)
-            if (current_time - chat_data['last_activity']).total_seconds() > 1800:
-                chat_data['users'].clear()
-            
-            # Check if user already in chat
-            if user_id in chat_data['users']:
-                chat_data['last_activity'] = current_time
-                return True, "User already in chat"
-            
-            # Check if chat is full
-            if len(chat_data['users']) >= self.max_users_per_chat:
-                return False, "Chat is full (max 3 users)"
-            
-            # Add user to chat
-            chat_data['users'][user_id] = username
-            chat_data['last_activity'] = current_time
-            return True, "User added successfully"
-            
-        except Exception as e:
-            logger.error(f"Error adding user to group chat: {str(e)}")
-            return False, str(e)
-
-    def remove_user_from_group_chat(self, chat_id: int, user_id: int):
-        """Remove user from group chat"""
-        try:
-            if chat_id in self.active_group_chats:
-                if user_id in self.active_group_chats[chat_id]['users']:
-                    del self.active_group_chats[chat_id]['users'][user_id]
-                    return True
-            return False
-        except Exception as e:
-            logger.error(f"Error removing user from group chat: {str(e)}")
-            return False
-
-    def get_group_chat_users(self, chat_id: int):
-        """Get all users in a group chat"""
-        try:
-            if chat_id in self.active_group_chats:
-                return self.active_group_chats[chat_id]['users']
-            return {}
-        except Exception as e:
-            logger.error(f"Error getting group chat users: {str(e)}")
-            return {}
-
-    def update_group_chat_activity(self, chat_id: int):
-        """Update last activity time for group chat"""
-        try:
-            if chat_id in self.active_group_chats:
-                self.active_group_chats[chat_id]['last_activity'] = datetime.now()
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error updating group chat activity: {str(e)}")
-            return False
-
-    def is_user_in_group_chat(self, chat_id: int, user_id: int):
-        """Check if user is in group chat"""
-        try:
-            return (chat_id in self.active_group_chats and 
-                   user_id in self.active_group_chats[chat_id]['users'])
-        except Exception as e:
-            logger.error(f"Error checking user in group chat: {str(e)}")
-            return False
-
-    def get_user_name_from_group(self, chat_id: int, user_id: int):
-        """Get username of user in group chat"""
-        try:
-            if (chat_id in self.active_group_chats and 
-                user_id in self.active_group_chats[chat_id]['users']):
-                return self.active_group_chats[chat_id]['users'][user_id]
-            return None
-        except Exception as e:
-            logger.error(f"Error getting username from group: {str(e)}")
-            return None
-
-    def clear_inactive_group_chats(self, timeout_seconds: int = 1800):
-        """Clear inactive group chats"""
-        try:
-            current_time = datetime.now()
-            inactive_chats = []
-            
-            for chat_id, chat_data in self.active_group_chats.items():
-                if (current_time - chat_data['last_activity']).total_seconds() > timeout_seconds:
-                    inactive_chats.append(chat_id)
-            
-            for chat_id in inactive_chats:
-                del self.active_group_chats[chat_id]
-                
-            return len(inactive_chats)
-        except Exception as e:
-            logger.error(f"Error clearing inactive group chats: {str(e)}")
-            return 0
 
 # Create a singleton instance
 db = Database()
