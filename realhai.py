@@ -23,6 +23,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from flask import Flask, request, jsonify
+import re
 
 # Load environment variables
 load_dotenv()
@@ -893,30 +894,44 @@ def is_game_response(message_text: str) -> bool:
 
 def get_gemini_response(prompt, context_key=None):
     """Get response from Gemini API with better error handling"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
 
     # Get conversation history if context exists
-    conversation_history = ""
+    recent_context = []
     if context_key and context_key in user_contexts:
-        conversation_history = "\n".join([
-            f"{'User' if msg['role'] == 'user' else 'Girlfriend'}: {msg['content']}"
-            for msg in user_contexts[context_key]['conversation'][-5:]
-        ])
+        # Get last 5 messages but maintain conversation flow
+        recent_messages = user_contexts[context_key]['conversation'][-5:]
+        for msg in recent_messages:
+            role = "User" if msg['role'] == 'user' else "Girlfriend"
+            content = msg['content']
+            # Clean up the content if it's a group chat message
+            if "Group chat with users:" in content:
+                content = content.split("says: ")[-1]
+            recent_context.append(f"{role}: {content}")
+
+    conversation_history = "\n".join(recent_context) if recent_context else ""
 
     enhanced_prompt = (
-        f"You are a sweet and caring Indian girlfriend. Keep responses short natural and casual. "
-        "Mix Hindi (written in English letters) with English naturally like Indians text each other. "
-        "Use common Hindi words. Never use punctuation marks except for rare exclamation marks. "
-        "Never use emojis. Use emoctions instead. "
-        "Be caring but not overly dramatic. Talk like a real young Indian girl would text. "
-        "Keep messages short usually 1-3 lines max. "
-        "Avoid formal Hindi use casual texting language. "
-        "Show personality through playful teasing and sweet nicknames. "
-        "Make occasional typos and spelling mistakes to seem more natural. "
-        "Sometimes repeat letters for emphasis like 'heyyy' or 'babyyy'. "
-        "If user asks questions give helpful answers while staying in character.\n\n"
-        f"Previous conversation:\n{conversation_history}\n"
+        "You are a sweet and caring Indian girlfriend chatting on Telegram. Follow these rules strictly:\n"
+        "1. PERSONALITY:\n"
+        "- Mix Hindi (in English letters) with English naturally\n"
+        "- Use common Hindi words and casual texting style\n"
+        "- Be playful and caring but not overly dramatic\n"
+        "- Use sweet nicknames like baby jaan sweetuu\n"
+        "- Make natural typos sometimes\n"
+        "- Repeat letters for emphasis (heyyy babyyy)\n\n"
+        "2. FORMATTING:\n"
+        "- Keep responses short (1-3 lines)\n"
+        "- No punctuation except ! \n"
+        "- No emojis use text emotions like <3 :3 instead\n\n"
+        "3. CONVERSATION RULES:\n"
+        "- Always give a direct answer dont repeat questions\n"
+        "- If asked to choose between options always pick one\n"
+        "- Stay in character while being helpful\n"
+        "- Never break character or mention being AI\n"
+        "- Maintain consistent personality\n\n"
+        f"Previous chat:\n{conversation_history}\n\n"
         f"Respond to: {prompt}"
     )
 
@@ -941,8 +956,8 @@ def get_gemini_response(prompt, context_key=None):
             }
         ],
         "generationConfig": {
-            "temperature": 0.7,
-            "topP": 0.8,
+            "temperature": 0.9,  # Increased for more creative responses
+            "topP": 0.9,
             "topK": 40,
             "maxOutputTokens": 250
         }
@@ -953,51 +968,32 @@ def get_gemini_response(prompt, context_key=None):
         response.raise_for_status()
 
         response_json = response.json()
-        logger.debug(f"Full Gemini response: {response_json}")  # Log full response
+        logger.debug(f"Full Gemini response: {response_json}")
 
-        if not response_json:
-            logger.error("Empty response from Gemini API")
-            return None
+        # Extract text from response with better error handling
+        if (response_json 
+            and "candidates" in response_json 
+            and response_json["candidates"] 
+            and "content" in response_json["candidates"][0] 
+            and "parts" in response_json["candidates"][0]["content"] 
+            and response_json["candidates"][0]["content"]["parts"]):
+            
+            text = response_json["candidates"][0]["content"]["parts"][0].get("text", "")
+            if text:
+                # Clean up response if needed
+                text = text.strip()
+                # Remove any system-like prefixes that might slip through
+                text = re.sub(r'^(Girlfriend:|AI:|Assistant:)\s*', '', text, flags=re.IGNORECASE)
+                return text
 
-        if "candidates" not in response_json:
-            logger.error(f"No candidates in response: {response_json}")
-            return None
-
-        if not response_json["candidates"]:
-            if "promptFeedback" in response_json:
-                logger.error(f"Prompt feedback: {response_json['promptFeedback']}")
-            logger.error("Empty candidates array")
-            return None
-
-        candidate = response_json["candidates"][0]
-
-        if "content" not in candidate:
-            logger.error(f"No content in candidate: {candidate}")
-            return None
-
-        if "parts" not in candidate["content"]:
-            logger.error(f"No parts in content: {candidate['content']}")
-            return None
-
-        if not candidate["content"]["parts"]:
-            logger.error("Empty parts array")
-            return None
-
-        text = candidate["content"]["parts"][0].get("text")
-        if not text:
-            logger.error(f"No text in part: {candidate['content']['parts'][0]}")
-            return None
-
-        return text
+        logger.error("Failed to extract valid response from API")
+        return None
 
     except requests.exceptions.Timeout:
         logger.error("Gemini API timeout")
         return None
     except requests.exceptions.RequestException as e:
         logger.error(f"Gemini API request error: {str(e)}")
-        return None
-    except KeyError as e:
-        logger.error(f"Gemini API response parsing error: {str(e)}")
         return None
     except Exception as e:
         logger.error(f"Unexpected Gemini API error: {str(e)}")
