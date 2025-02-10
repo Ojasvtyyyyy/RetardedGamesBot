@@ -338,7 +338,7 @@ class GameReader:
             'nsfwwyr': os.path.join(self.base_path, 'nsfwwyr.csv'),
             'redgreenflag': os.path.join(self.base_path, 'redgreenflag.csv'),
             'evilornot': os.path.join(self.base_path, 'evilornot.csv'),
-            'fmk': os.path.join(self.base_path, 'fmk.csv')
+            'smk': os.path.join(self.base_path, 'smk.csv')
         }
         self.dataframes = {}
         logger.info(f"Current working directory: {os.getcwd()}")
@@ -518,13 +518,13 @@ def send_welcome(message):
             "🔞 /nsfwwyr - NSFW Would You Rather\n"
             "🚩 /redgreenflag - Red flag or Green flag?\n"
             "😈 /evilornot - Evil or Not?\n"
-            "💘 /fmk - Slap, Marry, Kiss\n"
+            "💘 /smk - Slap, Marry, Kiss\n"
             "💝 /gf - Chat with your clingy girlfriend\n"
             "🎲 /random - Get a random question\n"
             "📊 /stats - See question statistics\n"
-            "📝 /register - Register for FMK group chat game\n"
-            "🚫 /remove - Remove yourself from FMK game\n"
-            "👥 /fmkgc - Play SMK with group members\n"
+            "📝 /register - Register for SMK group chat game\n"
+            "🚫 /remove - Remove yourself from SMK game\n"
+            "👥 /smkgc - Play SMK with group members\n"
             "ℹ️ /help - Show detailed help\n"
             "❓ /about - About this bot\n\n"
             "Created by @RetardedGamesBotDevBot"
@@ -548,16 +548,16 @@ def send_help(message):
             "🔞 /nsfwwyr - NSFW Would You Rather\n"
             "🚩 /redgreenflag - Red flag or Green flag?\n"
             "😈 /evilornot - Evil or Not?\n"
-            "💘 /fmk - Slap, Marry, Kiss\n"
+            "💘 /smk - Slap, Marry, Kiss\n"
             "💝 /gf - Chat with your clingy girlfriend\n"
             "💖 /girlfriend - Same as /gf\n"
             "💕 /bae - Another way to start chat\n"
             "💗 /baby - One more way to begin\n"
             "🎲 /random - Get a random question\n"
             "📊 /stats - See question statistics\n"
-            "📝 /register - Register for FMK group chat game\n"
-            "🚫 /remove - Remove yourself from FMK game\n"
-            "👥 /fmkgc - Play SMK with group members\n\n"
+            "📝 /register - Register for SMK group chat game\n"
+            "🚫 /remove - Remove yourself from SMK game\n"
+            "👥 /smkgc - Play SMK with group members\n\n"
             "For girlfriend chat:\n"
             "• Reply to continue conversation\n"
             "• Be sweet, she's emotional 🥺\n"
@@ -635,7 +635,7 @@ def create_game_handler(game_type, emoji):
 
 @bot.message_handler(commands=['register'])
 def register_for_fmk(message):
-    """Register user for FMK game"""
+    """Register user for SMK game"""
     try:
         if message.chat.type not in ['group', 'supergroup']:
             return bot.reply_to(message, "📝 This command only works in group chats!")
@@ -645,13 +645,13 @@ def register_for_fmk(message):
         user_name = message.from_user.first_name or message.from_user.username
 
         # Get current players from database
-        players = db.get_fmk_players(chat_id)
+        players = db.get_smk_players(chat_id)
         if any(player['user_id'] == user_id for player in players):
-            return bot.reply_to(message, f"💫 {user_name}, you're already registered for FMK!")
+            return bot.reply_to(message, f"💫 {user_name}, you're already registered for SMK!")
 
         # Add player to database
-        if db.add_fmk_player(chat_id, user_id, user_name):
-            bot.reply_to(message, f"✅ {user_name} has been registered for FMK! Total players: {len(players) + 1}")
+        if db.add_smk_player(chat_id, user_id, user_name):
+            bot.reply_to(message, f"✅ {user_name} has been registered for SMK! Total players: {len(players) + 1}")
         else:
             bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
@@ -669,28 +669,28 @@ def remove_from_fmk(message):
 
         # Check if user is registered
         if not db.is_user_registered(chat_id, user_id):
-            bot.reply_to(message, f"Hey {user_name}, you're not registered for FMK in this chat! Use /register to join.")
+            bot.reply_to(message, f"Hey {user_name}, you're not registered for SMK in this chat! Use /register to join.")
             return
 
-        # Remove user from FMK players
-        if db.remove_fmk_player(chat_id, user_id):
-            bot.reply_to(message, f"ℹ️ Successfully removed {user_name} from FMK players!")
+        # Remove user from SMK players
+        if db.remove_smk_player(chat_id, user_id):
+            bot.reply_to(message, f"ℹ️ Successfully removed {user_name} from SMK players!")
         else:
-            bot.reply_to(message, f"Sorry {user_name}, couldn't remove you from FMK players. Please try again!")
+            bot.reply_to(message, f"Sorry {user_name}, couldn't remove you from SMK players. Please try again!")
 
     except Exception as e:
         logger.error(f"Error in remove command: {str(e)}")
         bot.reply_to(message, "Sorry, something went wrong. Please try again!")
 
-@bot.message_handler(commands=['fmkgc'])
-def fmk_group_chat(message):
+@bot.message_handler(commands=['smkgc'])
+def smk_group_chat(message):
     """Play SMK with group chat members"""
     try:
         if message.chat.type not in ['group', 'supergroup']:
             return bot.reply_to(message, "📝 This command only works in group chats!")
 
         chat_id = message.chat.id
-        registered_users = list(fmk_registered_users[chat_id])
+        registered_users = list(smk_registered_users[chat_id])
 
         if len(registered_users) < 3:
             return bot.reply_to(
@@ -716,7 +716,7 @@ def fmk_group_chat(message):
         bot.reply_to(message, smk_text)
 
     except Exception as e:
-        logger.error(f"Error in fmkgc command: {str(e)}")
+        logger.error(f"Error in smkgc command: {str(e)}")
         bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
 # Register command handlers
@@ -728,7 +728,7 @@ bot.message_handler(commands=['petitions'])(create_game_handler('petitions', '�
 bot.message_handler(commands=['nsfwwyr'])(create_game_handler('nsfwwyr', '🔞'))
 bot.message_handler(commands=['redgreenflag'])(create_game_handler('redgreenflag', '🚩'))
 bot.message_handler(commands=['evilornot'])(create_game_handler('evilornot', '😈'))
-bot.message_handler(commands=['fmk'])(create_game_handler('fmk', '💘'))
+bot.message_handler(commands=['smk'])(create_game_handler('smk', '💘'))
 
 def handle_random_command(message):
     """Handle the /random command by selecting a random game"""
@@ -757,7 +757,7 @@ def get_emoji_for_game(game_type):
         'nsfwwyr': '🔞',
         'redgreenflag': '🚩',
         'evilornot': '😈',
-        'fmk': '💘'
+        'smk': '💘'
     }
     return emoji_map.get(game_type, '🎲')
 
@@ -780,7 +780,7 @@ def send_stats(message):
             f"• NSFW WYR: {len(game_reader.dataframes.get('nsfwwyr', []))}\n"
             f"• Red/Green Flag: {len(game_reader.dataframes.get('redgreenflag', []))}\n"
             f"• Evil or Not: {len(game_reader.dataframes.get('evilornot', []))}\n"
-            f"• FMK: {len(game_reader.dataframes.get('fmk', []))}\n"
+            f"• SMK: {len(game_reader.dataframes.get('smk', []))}\n"
         )
         bot.reply_to(message, stats_text)
     except Exception as e:
@@ -813,11 +813,11 @@ def is_game_response(message_text: str) -> bool:
         "👥 Slap, Marry, Kiss:",
         # Add FMK group chat patterns
         "📝 This command only works in group chats!",
-        "💫", "you're already registered for FMK!",
-        "✅", "has been registered for FMK! Total players:",
-        "❌", "you're not registered for FMK!",
-        "🚫", "has been removed from FMK! Total players:",
-        "⚠️ Not enough players registered for FMK!",
+        "💫", "you're already registered for SMK!",
+        "✅", "has been registered for SMK! Total players:",
+        "❌", "you're not registered for SMK!",
+        "🚫", "has been removed from SMK! Total players:",
+        "⚠️ Not enough players registered for SMK!",
         "Need at least 3 players.",
         "Use /register to join the game! 📝",
         "💘 Slap, Marry, Kiss:",
@@ -844,7 +844,7 @@ def is_game_response(message_text: str) -> bool:
         "NSFW content currently unavailable.",
         "Red/Green flag scenario not found.",
         "Evil or Not situation unavailable.",
-        "FMK options not available.",
+        "SMK options not available.",
 
         # Rate limit and cooldown messages
         f"baby! 🥺 Itni jaldi jaldi baatein",
@@ -870,7 +870,7 @@ def is_game_response(message_text: str) -> bool:
         "📊 nsfwwyr:",
         "📊 redgreenflag:",
         "📊 evilornot:",
-        "📊 fmk:",
+        "📊 smk:",
         "📊 Total:",
     ]
 
@@ -890,31 +890,40 @@ def is_game_response(message_text: str) -> bool:
 
 def get_gemini_response(prompt, context_key=None):
     """Get response from Gemini API with better error handling"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
 
-    # Get conversation history if context exists
+    # Get conversation history and current users if context exists
     conversation_history = ""
-    if context_key and context_key in user_contexts:
-        conversation_history = "\n".join([
-            f"{'User' if msg['role'] == 'user' else 'Girlfriend'}: {msg['content']}"
-            for msg in user_contexts[context_key]['conversation'][-5:]
-        ])
+    current_users = {}
+    if context_key:
+        chat_id = int(context_key)
+        current_users = db.get_group_chat_users(chat_id)
+        if context_key in user_contexts:
+            conversation_history = "\n".join([
+                f"{msg['username']}: {msg['content']}"
+                for msg in user_contexts[context_key]['conversation'][-5:]
+            ])
 
     enhanced_prompt = (
-        f"You are a sweet and caring Indian girlfriend. Keep responses short natural and casual. "
+        f"You are a sweet and caring Indian girlfriend in a group chat with {len(current_users)} users: {', '.join(current_users.values())}. "
+        "Keep responses short, natural and casual. "
         "Mix Hindi (written in English letters) with English naturally like Indians text each other. "
         "Use common Hindi words. Never use punctuation marks except for rare exclamation marks. "
-        "Never use emojis. Use emoctions instead. "
+        "Never use emojis. Use emoticons instead. "
         "Be caring but not overly dramatic. Talk like a real young Indian girl would text. "
         "Keep messages short usually 1-3 lines max. "
         "Avoid formal Hindi use casual texting language. "
         "Show personality through playful teasing and sweet nicknames. "
         "Make occasional typos and spelling mistakes to seem more natural. "
         "Sometimes repeat letters for emphasis like 'heyyy' or 'babyyy'. "
-        "If user asks questions give helpful answers while staying in character.\n\n"
+        "Always address users by their names when responding. "
+        "If users ask to choose between options, make a clear choice. "
+        "Remember what each user says and reference it in responses. "
+        "Don't repeat questions back to users.\n\n"
         f"Previous conversation:\n{conversation_history}\n"
-        f"Respond to: {prompt}"
+        f"Current user: {prompt['username']}\n"
+        f"Respond to: {prompt['content']}"
     )
 
     data = {
@@ -1080,8 +1089,8 @@ def check_rate_limit(user_id):
     return True
 
 @bot.message_handler(commands=['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
-                             'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk',
-                             'register', 'remove', 'fmkgc', 'help', 'about', 'random'])
+                             'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'smk',
+                             'register', 'remove', 'smkgc', 'help', 'about', 'random'])
 def handle_game_commands(message):
     """Handle game commands and track them"""
     try:
@@ -1101,14 +1110,14 @@ def handle_game_commands(message):
             bot.clear_step_handler_by_chat_id(chat_id)
 
         # Create and handle the game
-        if command in ['register', 'remove', 'fmkgc']:
-            # Call the specific handler for FMK commands
+        if command in ['register', 'remove', 'smkgc']:
+            # Call the specific handler for SMK commands
             if command == 'register':
-                register_for_fmk(message)
+                register_for_smk(message)
             elif command == 'remove':
-                remove_from_fmk(message)
-            elif command == 'fmkgc':
-                fmk_group_chat(message)
+                remove_from_smk(message)
+            elif command == 'smkgc':
+                smk_group_chat(message)
         else:
             # Handle other game commands
             create_game_handler(command, get_emoji_for_game(command))(message)
@@ -1119,6 +1128,17 @@ def handle_game_commands(message):
 def process_therapy_response(message):
     """Process responses in therapy chat mode"""
     try:
+        # First check if user is blocked
+        user_id = message.from_user.id
+        if db.is_user_blocked(user_id):
+            logger.info(f"Blocked user {user_id} attempted to chat")
+            # End conversation and clear handlers
+            chat_id = message.chat.id
+            if chat_id in active_conversations:
+                del active_conversations[chat_id]
+            bot.clear_step_handler_by_chat_id(chat_id)
+            return
+
         # First check if this is a reply to a game message
         if message.reply_to_message and message.reply_to_message.text:
             is_game = is_game_response(message.reply_to_message.text)
@@ -1213,32 +1233,20 @@ def start_gf_chat(message):
             )
 
         # Check if user is blocked
-        try:
-            if db.is_user_blocked(user_id):
-                logger.info(f"Blocked user {user_id} attempted to use /gf")
-                return
-        except Exception as e:
-            logger.error(f"Error checking block status: {str(e)}")
-            # Continue with default not-blocked behavior
+        if db.is_user_blocked(user_id):
+            logger.info(f"Blocked user {user_id} attempted to use /gf")
+            return
 
-        # Check if user has agreed to terms
-        try:
-            if not db.has_user_agreed(user_id):
-                logger.info(f"User {user_id} needs to agree to terms")
-                return send_terms_and_conditions(chat_id)
-        except Exception as e:
-            logger.error(f"Error checking user agreement: {str(e)}")
-            # Continue with requiring agreement
-            return send_terms_and_conditions(chat_id)
+        # Clear any existing context for this chat
+        context_key = f"{chat_id}"
+        if context_key in user_contexts:
+            del user_contexts[context_key]
+            logger.debug(f"Cleared existing context for chat {chat_id}")
 
-        # Check if user is rate limited
-        if not check_rate_limit(user_id):
-            return bot.reply_to(
-                message,
-                f"{user_name} baby! Itni jaldi jaldi baatein karne se meri heartbeat badh rahi hai 🥺\n"
-                f"Thoda break lete hain? {COOLDOWN_PERIOD} seconds mein wapas baat karenge 💕\n"
-                f"Tab tak mujhe miss karna 💝"
-            )
+        # Try to add user to group chat
+        success, message_text = db.add_user_to_group_chat(chat_id, user_id, user_name)
+        if not success:
+            return bot.reply_to(message, f"Sorry {user_name}, {message_text} 🥺")
 
         # Switch to chat mode
         set_chat_mode(chat_id, CHAT_MODE)
@@ -1246,19 +1254,15 @@ def start_gf_chat(message):
         # Clear any existing next step handlers
         bot.clear_step_handler_by_chat_id(chat_id)
 
-        # End any existing conversation
-        if chat_id in active_conversations:
-            del active_conversations[chat_id]
-
-        # Set this user as the active conversation holder
-        active_conversations[chat_id] = {
-            'user_id': user_id,
-            'timestamp': datetime.now(),
-            'last_interaction': datetime.now()
-        }
+        # Get current users in chat
+        current_users = db.get_group_chat_users(chat_id)
+        users_text = ", ".join(current_users.values())
 
         # Get random opening message
-        opening_message = random.choice(OPENING_MESSAGES).format(name=user_name)
+        if len(current_users) > 1:
+            opening_message = f"Heyyy everyone! {users_text} 💕 Main aa gayi! Kya baatein ho rahi hain? 🥰"
+        else:
+            opening_message = random.choice(OPENING_MESSAGES).format(name=user_name)
 
         # Send typing action and message
         bot.send_chat_action(chat_id, 'typing')
@@ -1388,8 +1392,8 @@ def is_game_command(message_text: str) -> bool:
     """Check if the message is a game command"""
     game_commands = [
         '/truth', '/thisorthat', '/neverhaveiever', '/wouldyourather',
-        '/petitions', '/nsfwwyr', '/redgreenflag', '/evilornot', '/fmk',
-        '/random', '/stats', '/help', '/about', '/register', '/remove', '/fmkgc',
+        '/petitions', '/nsfwwyr', '/redgreenflag', '/evilornot', '/smk',
+        '/random', '/stats', '/help', '/about', '/register', '/remove', '/smkgc',
         '/history'
     ]
     # Strip bot username from command if present
@@ -1412,15 +1416,15 @@ def setup_commands():
             telebot.types.BotCommand("nsfwwyr", "🔞 NSFW Would You Rather"),
             telebot.types.BotCommand("redgreenflag", "🚩 Red flag or Green flag?"),
             telebot.types.BotCommand("evilornot", "😈 Evil or Not?"),
-            telebot.types.BotCommand("fmk", "💘 Slap, Marry, Kiss"),
+            telebot.types.BotCommand("smk", "💘 Slap, Marry, Kiss"),
             telebot.types.BotCommand("gf", "💝 Chat with your clingy girlfriend"),
             telebot.types.BotCommand("random", "🎲 Get a random question"),
             telebot.types.BotCommand("stats", "📊 See question statistics"),
             telebot.types.BotCommand("help", "ℹ️ Show detailed help"),
             telebot.types.BotCommand("about", "❓ About this bot"),
-            telebot.types.BotCommand("register", "📝 Register for FMK group chat game"),
-            telebot.types.BotCommand("remove", "🚫 Remove yourself from FMK game"),
-            telebot.types.BotCommand("fmkgc", "👥 Play SMK with group members"),
+            telebot.types.BotCommand("register", "📝 Register for SMK group chat game"),
+            telebot.types.BotCommand("remove", "🚫 Remove yourself from SMK game"),
+            telebot.types.BotCommand("smkgc", "👥 Play SMK with group members"),
             telebot.types.BotCommand("history", "📜 View chat history (Admin only)")
         ]
 
@@ -1578,13 +1582,13 @@ def register_handlers():
     bot.message_handler(commands=['stats'])(send_stats)
     bot.message_handler(commands=['random'])(random_command)
     bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])(start_gf_chat)
-    bot.message_handler(commands=['register'])(register_for_fmk)
-    bot.message_handler(commands=['remove'])(remove_from_fmk)
+    bot.message_handler(commands=['register'])(register_for_smk)
+    bot.message_handler(commands=['remove'])(remove_from_smk)
     bot.message_handler(commands=['block'])(block_user_command)
     bot.message_handler(commands=['unblock'])(unblock_user_command)
     bot.message_handler(commands=['truth', 'thisorthat', 'neverhaveiever', 'wouldyourather',
-                                'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'fmk',
-                                'fmkgc'])(handle_game_commands)
+                                'petitions', 'nsfwwyr', 'redgreenflag', 'evilornot', 'smk',
+                                'smkgc'])(handle_game_commands)
     
     # Register the general message handler
     bot.message_handler(func=lambda message: True)(handle_all_messages)
