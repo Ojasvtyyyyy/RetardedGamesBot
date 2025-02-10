@@ -13,12 +13,14 @@ logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self):
+        # Initialize reconnection timer first
+        self.last_reconnect_attempt = 0
+        self.reconnect_cooldown = 60  # seconds
+        
+        # Then initialize database connections
         self.client = None
         self.db = None
         self.connect()
-        # Add reconnection timer
-        self.last_reconnect_attempt = 0
-        self.reconnect_cooldown = 60  # seconds
 
     def connect(self):
         """Connect to MongoDB with improved retry logic"""
