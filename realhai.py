@@ -900,17 +900,24 @@ def get_gemini_response(prompt, context_key=None):
     # Get conversation history if context exists
     recent_context = []
     if context_key and context_key in user_contexts:
+        logger.debug(f"Getting context for key: {context_key}")
         # Get last 5 messages but maintain conversation flow
         recent_messages = user_contexts[context_key]['conversation'][-5:]
+        logger.debug(f"Recent messages count: {len(recent_messages)}")
+        
         for msg in recent_messages:
             role = "User" if msg['role'] == 'user' else "Girlfriend"
             content = msg['content']
             # Clean up the content if it's a group chat message
             if "Group chat with users:" in content:
+                logger.debug(f"Cleaning group chat message: {content}")
                 content = content.split("says: ")[-1]
             recent_context.append(f"{role}: {content}")
+            logger.debug(f"Added to context - {role}: {content}")
 
     conversation_history = "\n".join(recent_context) if recent_context else ""
+    logger.debug(f"Final conversation history:\n{conversation_history}")
+    logger.debug(f"Current prompt: {prompt}")
 
     enhanced_prompt = (
         "You are a sweet and caring Indian girlfriend chatting on Telegram. Follow these rules strictly:\n"
@@ -935,6 +942,11 @@ def get_gemini_response(prompt, context_key=None):
         f"Respond to: {prompt}"
     )
 
+    logger.debug("=" * 50)
+    logger.debug("FULL PROMPT BEING SENT TO AI:")
+    logger.debug(enhanced_prompt)
+    logger.debug("=" * 50)
+
     data = {
         "contents": [{"parts": [{"text": enhanced_prompt}]}],
         "safetySettings": [
@@ -956,7 +968,7 @@ def get_gemini_response(prompt, context_key=None):
             }
         ],
         "generationConfig": {
-            "temperature": 0.9,  # Increased for more creative responses
+            "temperature": 0.9,
             "topP": 0.9,
             "topK": 40,
             "maxOutputTokens": 250
@@ -968,7 +980,10 @@ def get_gemini_response(prompt, context_key=None):
         response.raise_for_status()
 
         response_json = response.json()
-        logger.debug(f"Full Gemini response: {response_json}")
+        logger.debug("=" * 50)
+        logger.debug("RAW AI RESPONSE:")
+        logger.debug(response_json)
+        logger.debug("=" * 50)
 
         # Extract text from response with better error handling
         if (response_json 
@@ -984,6 +999,10 @@ def get_gemini_response(prompt, context_key=None):
                 text = text.strip()
                 # Remove any system-like prefixes that might slip through
                 text = re.sub(r'^(Girlfriend:|AI:|Assistant:)\s*', '', text, flags=re.IGNORECASE)
+                logger.debug("=" * 50)
+                logger.debug("FINAL CLEANED RESPONSE:")
+                logger.debug(text)
+                logger.debug("=" * 50)
                 return text
 
         logger.error("Failed to extract valid response from API")
