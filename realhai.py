@@ -1708,8 +1708,37 @@ if __name__ == "__main__":
             def index():
                 return 'Bot is running!', 200
                 
-            # ... rest of your Flask routes ...
-            
+            # Add health check route
+            @app.route('/health')
+            def health():
+                try:
+                    # Test database connection
+                    if not db.ensure_connection():
+                        return jsonify({
+                            'status': 'unhealthy',
+                            'error': 'Database connection failed',
+                            'timestamp': datetime.now().isoformat()
+                        }), 500
+
+                    # Test bot API connection
+                    bot.get_me()
+
+                    # If everything is OK
+                    return jsonify({
+                        'status': 'healthy',
+                        'database': 'connected',
+                        'bot': 'active',
+                        'timestamp': datetime.now().isoformat()
+                    }), 200
+
+                except Exception as e:
+                    logger.error(f"Health check failed: {str(e)}")
+                    return jsonify({
+                        'status': 'unhealthy',
+                        'error': str(e),
+                        'timestamp': datetime.now().isoformat()
+                    }), 500
+
             # Modify the webhook route to be more specific
             @app.route('/webhook', methods=['POST'])
             def webhook():
