@@ -901,37 +901,57 @@ def get_gemini_response(prompt, context_key=None):
     recent_context = []
     if context_key and context_key in user_contexts:
         logger.debug(f"Getting context for key: {context_key}")
-        # Get last 5 messages but maintain conversation flow
-        recent_messages = user_contexts[context_key]['conversation'][-5:]
+        # Get last 12 messages but maintain conversation flow
+        recent_messages = user_contexts[context_key]['conversation'][-12:]
         logger.debug(f"Recent messages count: {len(recent_messages)}")
         
         for msg in recent_messages:
-            role = "User" if msg['role'] == 'user' else "Girlfriend"
+            role = msg['role']
             content = msg['content']
-            # Clean up the content if it's a group chat message
-            if "Group chat with users:" in content:
-                logger.debug(f"Cleaning group chat message: {content}")
-                content = content.split("says: ")[-1]
-            recent_context.append(f"{role}: {content}")
+            
+            # Extract username if it's a group chat message
+            if "Group chat with users:" in content and "says:" in content:
+                username = content.split("says:")[0].split(":")[-1].strip()
+                content = content.split("says:")[-1].strip()
+                recent_context.append(f"{username}: {content}")
+            else:
+                # For regular messages
+                role_name = "Girlfriend" if role == 'assistant' else msg.get('username', 'User')
+                recent_context.append(f"{role_name}: {content}")
+            
             logger.debug(f"Added to context - {role}: {content}")
 
     conversation_history = "\n".join(recent_context) if recent_context else ""
+    
+    # Check if it's a group chat
+    is_group_chat = False
+    active_users = []
+    chat_id = context_key.split('_')[0] if context_key else None
+    
+    if chat_id and chat_id in active_conversations:
+        active_users = [data['name'] for data in active_conversations[chat_id]['users'].values()]
+        is_group_chat = len(active_users) > 1
+
+    logger.debug(f"Active users: {active_users}")
+    logger.debug(f"Is group chat: {is_group_chat}")
     logger.debug(f"Final conversation history:\n{conversation_history}")
     logger.debug(f"Current prompt: {prompt}")
 
+    group_context = f"You are in a group chat with {', '.join(active_users)}. " if is_group_chat else ""
+    
     enhanced_prompt = (
-        "You are a sweet and caring Indian girlfriend chatting on Telegram. Follow these rules strictly:\n"
+        f"{group_context}You are a sweet and caring Indian girlfriend chatting on Telegram group. Follow these rules strictly:\n"
         "1. PERSONALITY:\n"
         "- Mix Hindi (in English letters) with English naturally\n"
         "- Use common Hindi words and casual texting style\n"
         "- Be playful and caring but not overly dramatic\n"
-        "- Use sweet nicknames like baby jaan sweetuu\n"
+        "- Use sweet nicknames\n"
         "- Make natural typos sometimes\n"
         "- Repeat letters for emphasis (heyyy babyyy)\n\n"
         "2. FORMATTING:\n"
         "- Keep responses short (1-3 lines)\n"
         "- No punctuation except ! \n"
-        "- No emojis use text emotions like <3 :3 instead\n\n"
+        "- No emojis use text emotions\n\n"
         "3. CONVERSATION RULES:\n"
         "- Always give a direct answer dont repeat questions\n"
         "- If asked to choose between options always pick one\n"
