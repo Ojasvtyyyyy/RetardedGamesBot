@@ -550,9 +550,8 @@ def send_help(message):
             "😈 /evilornot - Evil or Not?\n"
             "💘 /fmk - Slap, Marry, Kiss\n"
             "💝 /gf - Chat with your clingy girlfriend\n"
-            "💖 /girlfriend - Same as /gf\n"
-            "💕 /bae - Another way to start chat\n"
-            "💗 /baby - One more way to begin\n"
+            "💖 /join - Join group chat (max 3 users)\n"  # Added
+            "💔 /leave - Leave group chat\n"  # Added
             "🎲 /random - Get a random question\n"
             "📊 /stats - See question statistics\n"
             "📝 /register - Register for FMK group chat game\n"
@@ -562,6 +561,7 @@ def send_help(message):
             "• Reply to continue conversation\n"
             "• Be sweet, she's emotional 🥺\n"
             "• Use /gf to wake her up\n"
+            "• Use /join to chat in group (max 3)\n"  # Added
         )
         bot.reply_to(message, help_text)
     except Exception as e:
@@ -1671,7 +1671,7 @@ def unblock_user_command(message):
         logger.error(f"Error in unblock command: {str(e)}")
         bot.reply_to(message, "ℹ️ An error occurred while unblocking the user.")
 
-@bot.message_handler(commands=['joinchat'])
+@bot.message_handler(commands=['join'])
 def join_group_chat(message):
     """Join the active group chat"""
     try:
@@ -1695,19 +1695,25 @@ def join_group_chat(message):
         # Try to add participant
         success, error_msg = db.add_chat_participant(chat_id, user_id, user_name)
         if success:
+            participants = db.get_chat_participants(chat_id)
+            participant_count = len(participants)
             bot.reply_to(
                 message,
                 f"Welcome to the group chat {user_name}! 💕\n"
-                "You can now chat with everyone here! 💝"
+                f"Currently {participant_count}/3 users in chat! 💝\n"
+                "Start chatting with everyone here! 🥰"
             )
         else:
-            bot.reply_to(message, f"Sorry {user_name}, {error_msg or 'something went wrong'} 🥺")
+            if error_msg == "Chat is full (max 3 users)":
+                bot.reply_to(message, f"Sorry {user_name}, chat is already full with 3 users 🥺")
+            else:
+                bot.reply_to(message, f"Sorry {user_name}, {error_msg or 'something went wrong'} 🥺")
 
     except Exception as e:
         logger.error(f"Error in join chat command: {str(e)}")
         bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
-@bot.message_handler(commands=['leavechat'])
+@bot.message_handler(commands=['leave'])
 def leave_group_chat(message):
     """Leave the active group chat"""
     try:
@@ -1715,8 +1721,19 @@ def leave_group_chat(message):
         user_id = message.from_user.id
         user_name = get_user_name(message)
 
+        # Check if user is actually in the chat
+        participants = db.get_chat_participants(chat_id)
+        if not any(p['user_id'] == user_id for p in participants):
+            return bot.reply_to(message, f"{user_name}, you're not in the group chat! 🤔")
+
         if db.remove_chat_participant(chat_id, user_id):
-            bot.reply_to(message, f"Bye bye {user_name}! Come back soon! 💕")
+            remaining_participants = db.get_chat_participants(chat_id)
+            participant_count = len(remaining_participants)
+            bot.reply_to(
+                message, 
+                f"Bye bye {user_name}! Come back soon! 💕\n"
+                f"({participant_count}/3 users remaining)"
+            )
         else:
             bot.reply_to(message, f"Sorry {user_name}, couldn't remove you from the chat 🥺")
 
