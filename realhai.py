@@ -889,32 +889,34 @@ def is_game_response(message_text: str) -> bool:
     return False
 
 def get_gemini_response(prompt, context_key=None):
-    """Get response from Gemini API with better error handling"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+    """Get response from Gemini API with group chat support"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
 
-    # Get conversation history if context exists
-    conversation_history = ""
-    if context_key and context_key in user_contexts:
-        conversation_history = "\n".join([
-            f"{'User' if msg['role'] == 'user' else 'Girlfriend'}: {msg['content']}"
-            for msg in user_contexts[context_key]['conversation'][-5:]
-        ])
+    # Get chat participants and history
+    chat_id = int(context_key.split('_')[0])
+    user_id = int(context_key.split('_')[1])
+    participants = db.get_chat_participants(chat_id)
+    conversation_history = db.get_chat_history_for_prompt(chat_id)
+
+    # Get username of current user
+    current_user = next((p['user_name'] for p in participants if p['user_id'] == user_id), f"User{user_id}")
 
     enhanced_prompt = (
-        f"You are a sweet and caring Indian girlfriend. Keep responses short natural and casual. "
-        "Mix Hindi (written in English letters) with English naturally like Indians text each other. "
-        "Use common Hindi words. Never use punctuation marks except for rare exclamation marks. "
-        "Never use emojis. Use emoctions instead. "
-        "Be caring but not overly dramatic. Talk like a real young Indian girl would text. "
-        "Keep messages short usually 1-3 lines max. "
-        "Avoid formal Hindi use casual texting language. "
-        "Show personality through playful teasing and sweet nicknames. "
-        "Make occasional typos and spelling mistakes to seem more natural. "
-        "Sometimes repeat letters for emphasis like 'heyyy' or 'babyyy'. "
-        "If user asks questions give helpful answers while staying in character.\n\n"
-        f"Previous conversation:\n{conversation_history}\n"
-        f"Respond to: {prompt}"
+        f"You are a sweet and caring Indian girlfriend in a group chat. "
+        f"Current speaker is {current_user}. Other participants: "
+        f"{', '.join(p['user_name'] for p in participants if p['user_id'] != user_id)}.\n\n"
+        "Rules:\n"
+        "1. Always address the current speaker by their name\n"
+        "2. Keep track of what each user said\n"
+        "3. If asked to choose between options, make a clear choice\n"
+        "4. Mix Hindi (in English letters) with English naturally\n"
+        "5. Keep responses short and casual\n"
+        "6. Don't repeat questions back\n"
+        "7. Stay in character as a playful girlfriend\n\n"
+        f"Previous conversation:\n{conversation_history}\n\n"
+        f"{current_user}: {prompt}\n"
+        "Your response:"
     )
 
     data = {
@@ -1122,37 +1124,30 @@ def process_therapy_response(message):
         # First check if this is a reply to a game message
         if message.reply_to_message and message.reply_to_message.text:
             is_game = is_game_response(message.reply_to_message.text)
-            logger.debug(f"Checking if reply is to game message: {is_game}")
             if is_game:
-                logger.debug("Ignoring reply to game message in therapy chat")
                 return
 
         chat_id = message.chat.id
         user_id = message.from_user.id
+        user_name = get_user_name(message)
 
-        # Verify we're still in chat mode and have an active conversation
-        current_mode = get_chat_mode(chat_id)
-        if current_mode != CHAT_MODE or chat_id not in active_conversations:
-            logger.debug(f"Chat mode: {current_mode}, Active conversation: {chat_id in active_conversations}")
+        # Check if user is blocked
+        if db.is_user_blocked(user_id):
+            logger.info(f"Blocked user {user_id} attempted to chat")
             return
 
-        # Verify this is the active conversation user
-        if active_conversations[chat_id]['user_id'] != user_id:
-            logger.debug(f"Ignoring message from non-active user {user_id}")
-            bot.reply_to(
+        # Get chat participants
+        participants = db.get_chat_participants(chat_id)
+        if not any(p['user_id'] == user_id for p in participants):
+            return bot.reply_to(
                 message,
-                "Baby, abhi main kisi aur se baat kar rahi hun 🥺\n"
-                "Aap /gf command use karo na, fir hum baat karenge! 💕\n"
-                "Thoda wait karlo please? Promise jaldi free ho jaungi 💝"
+                f"Baby {user_name}, use /joinchat to join the conversation! 💕"
             )
-            return
 
-        logger.debug(f"Processing therapy response from user {user_id} in chat {chat_id}")
-
-        # Update last interaction time
-        if chat_id in active_conversations:
-            active_conversations[chat_id]['last_interaction'] = datetime.now()
-            logger.debug(f"Updated last interaction time for user {user_id}")
+        # Check participant limit
+        if len(participants) > 3:
+            db.remove_chat_participant(chat_id, user_id)
+            return bot.reply_to(message, "Sorry, chat is full (max 3 users) 🥺")
 
         # Get or create context key
         context_key = f"{chat_id}_{user_id}"
@@ -1171,24 +1166,20 @@ def process_therapy_response(message):
         # Try to get AI response with retries
         max_retries = 3
         for attempt in range(max_retries):
-            logger.debug(f"Attempt {attempt + 1} to get AI response")
             ai_response = get_gemini_response(message.text, context_key)
             if ai_response:
-                # Add AI response to context
                 user_contexts[context_key]['conversation'].append({
                     'role': 'assistant',
                     'content': ai_response
                 })
-                log_interaction(message, ai_response)  # Log the interaction
+                log_interaction(message, ai_response)
                 bot.reply_to(message, ai_response)
-                logger.debug("Sent AI response")
                 break
-            time.sleep(1)  # Wait before retry
+            time.sleep(1)
 
         if not ai_response:
-            logger.debug("Failed to get AI response after retries")
             error_cooldowns[user_id] = time.time()
-            fallback_message = random.choice(API_ERROR_MESSAGES).format(name=get_user_name(message))
+            fallback_message = random.choice(API_ERROR_MESSAGES).format(name=user_name)
             bot.reply_to(message, fallback_message)
 
     except Exception as e:
@@ -1421,7 +1412,9 @@ def setup_commands():
             telebot.types.BotCommand("register", "📝 Register for FMK group chat game"),
             telebot.types.BotCommand("remove", "🚫 Remove yourself from FMK game"),
             telebot.types.BotCommand("fmkgc", "👥 Play SMK with group members"),
-            telebot.types.BotCommand("history", "📜 View chat history (Admin only)")
+            telebot.types.BotCommand("history", "📜 View chat history (Admin only)"),
+            telebot.types.BotCommand("joinchat", "Join the group chat (max 3 users)"),
+            telebot.types.BotCommand("leavechat", "Leave the group chat"),
         ]
 
         # Set commands for default scope (shows in all chats)
@@ -1677,6 +1670,59 @@ def unblock_user_command(message):
     except Exception as e:
         logger.error(f"Error in unblock command: {str(e)}")
         bot.reply_to(message, "ℹ️ An error occurred while unblocking the user.")
+
+@bot.message_handler(commands=['joinchat'])
+def join_group_chat(message):
+    """Join the active group chat"""
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        user_name = get_user_name(message)
+
+        # Check if user is blocked
+        if db.is_user_blocked(user_id):
+            logger.info(f"Blocked user {user_id} attempted to join chat")
+            return
+
+        # Check if user has agreed to terms
+        if not db.has_user_agreed(user_id):
+            return bot.reply_to(
+                message,
+                f"Baby {user_name}! 💕 Pehle terms accept karo na 🥺\n"
+                f"Use /gf in private chat first! 💝"
+            )
+
+        # Try to add participant
+        success, error_msg = db.add_chat_participant(chat_id, user_id, user_name)
+        if success:
+            bot.reply_to(
+                message,
+                f"Welcome to the group chat {user_name}! 💕\n"
+                "You can now chat with everyone here! 💝"
+            )
+        else:
+            bot.reply_to(message, f"Sorry {user_name}, {error_msg or 'something went wrong'} 🥺")
+
+    except Exception as e:
+        logger.error(f"Error in join chat command: {str(e)}")
+        bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
+
+@bot.message_handler(commands=['leavechat'])
+def leave_group_chat(message):
+    """Leave the active group chat"""
+    try:
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        user_name = get_user_name(message)
+
+        if db.remove_chat_participant(chat_id, user_id):
+            bot.reply_to(message, f"Bye bye {user_name}! Come back soon! 💕")
+        else:
+            bot.reply_to(message, f"Sorry {user_name}, couldn't remove you from the chat 🥺")
+
+    except Exception as e:
+        logger.error(f"Error in leave chat command: {str(e)}")
+        bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
 # Modify your main block to include the handler registration
 if __name__ == "__main__":
