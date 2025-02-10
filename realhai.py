@@ -1693,63 +1693,24 @@ if __name__ == "__main__":
         # Set webhook if RENDER_EXTERNAL_URL is provided
         webhook_url = environ.get('RENDER_EXTERNAL_URL')
         if webhook_url:
+            # Ensure webhook URL ends with /webhook
+            if not webhook_url.endswith('/webhook'):
+                webhook_url = f"{webhook_url}/webhook"
+            
             logger.info(f"Setting webhook to {webhook_url}")
-            bot.set_webhook(url=f"{webhook_url}/webhook")
+            bot.set_webhook(url=webhook_url)
             
             # Start Flask server
             app = Flask(__name__)
             
-            # Add these configurations to your Flask app
-            app.config.update(
-                PREFERRED_URL_SCHEME='https',
-                PROPAGATE_EXCEPTIONS=True,
-                MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max-limit
-                PERMANENT_SESSION_LIFETIME=timedelta(minutes=30)
-            )
-
-            # Add error handlers
-            @app.errorhandler(500)
-            def handle_500_error(e):
-                logger.error(f"Internal server error: {str(e)}")
-                return 'Internal server error', 500
-
-            @app.errorhandler(502)
-            def handle_502_error(e):
-                logger.error(f"Bad gateway error: {str(e)}")
-                return 'Server is starting up, please try again', 502
-
-            @app.errorhandler(Exception)
-            def handle_exception(e):
-                logger.error(f"Unhandled exception: {str(e)}")
-                return 'An unexpected error occurred', 500
-
-            # Add health check endpoint
-            @app.route('/health')
-            def health_check():
-                try:
-                    # Test database connection
-                    if not db.ensure_connection():
-                        return 'Database connection failed', 500
-                        
-                    # Test bot API
-                    bot.get_me()
-                    
-                    return jsonify({
-                        'status': 'healthy',
-                        'timestamp': datetime.now().isoformat(),
-                        'database': 'connected',
-                        'bot': 'active'
-                    }), 200
-                    
-                except Exception as e:
-                    logger.error(f"Health check failed: {str(e)}")
-                    return jsonify({
-                        'status': 'unhealthy',
-                        'error': str(e),
-                        'timestamp': datetime.now().isoformat()
-                    }), 500
-
-            # Modify the webhook route
+            # Add root route for basic health check
+            @app.route('/')
+            def index():
+                return 'Bot is running!', 200
+                
+            # ... rest of your Flask routes ...
+            
+            # Modify the webhook route to be more specific
             @app.route('/webhook', methods=['POST'])
             def webhook():
                 if request.headers.get('content-type') == 'application/json':
@@ -1760,17 +1721,21 @@ if __name__ == "__main__":
                         return '', 200
                     except Exception as e:
                         logger.error(f"Error processing webhook: {str(e)}")
-                        return 'Error processing update', 500
+                        return jsonify({'error': str(e)}), 500
                 else:
-                    return 'Invalid content type', 403
-                    
-            # Modify the app.run call
-            app.run(
-                host='0.0.0.0',
-                port=port,
-                threaded=True,
-                use_reloader=False
-            )
+                    return jsonify({'error': 'Invalid content type'}), 403
+
+            # Start server with proper error handling
+            try:
+                app.run(
+                    host='0.0.0.0',
+                    port=port,
+                    threaded=True,
+                    use_reloader=False
+                )
+            except Exception as e:
+                logger.error(f"Flask server error: {str(e)}")
+                raise
             
         else:
             # If no webhook URL, use polling (for local development)
