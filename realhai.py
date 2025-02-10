@@ -1206,19 +1206,30 @@ def process_therapy_response(message, single_user=True, context=None):
             # Get all active users in the conversation
             active_users = active_conversations[chat_id]['users']
             users_context = ", ".join(data['name'] for data in active_users.values())
-            enhanced_prompt = (
-                f"Group chat with users: {users_context}\n"
-                f"{get_user_name(message)} says: {message.text}"
-            )
+            
+            # Include the full conversation context if provided
+            if context:
+                enhanced_prompt = (
+                    f"Group chat with users: {users_context}\n"
+                    f"Previous conversation:\n{context}\n"
+                    f"{get_user_name(message)} says: {message.text}"
+                )
+            else:
+                enhanced_prompt = (
+                    f"Group chat with users: {users_context}\n"
+                    f"{get_user_name(message)} says: {message.text}"
+                )
 
         # Add user message to context
         user_contexts[context_key]['conversation'].append({
             'role': 'user',
-            'content': enhanced_prompt
+            'content': enhanced_prompt,
+            'username': get_user_name(message)
         })
 
         # Try to get AI response with retries
         max_retries = 3
+        ai_response = None
         for attempt in range(max_retries):
             logger.debug(f"Attempt {attempt + 1} to get AI response")
             ai_response = get_gemini_response(enhanced_prompt, context_key)
@@ -1231,7 +1242,7 @@ def process_therapy_response(message, single_user=True, context=None):
                 log_interaction(message, ai_response)  # Log the interaction
                 bot.reply_to(message, ai_response)
                 logger.debug("Sent AI response")
-                break
+                return ai_response
             time.sleep(1)  # Wait before retry
 
         if not ai_response:
@@ -1239,11 +1250,13 @@ def process_therapy_response(message, single_user=True, context=None):
             error_cooldowns[user_id] = time.time()
             fallback_message = random.choice(API_ERROR_MESSAGES).format(name=get_user_name(message))
             bot.reply_to(message, fallback_message)
+            return None
 
     except Exception as e:
         logger.error(f"Error in therapy response: {str(e)}", exc_info=True)
         error_cooldowns[user_id] = time.time()
-        return bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=get_user_name(message)))
+        bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=get_user_name(message)))
+        return None
 
 @bot.message_handler(commands=['gf', 'girlfriend', 'bae', 'baby'])
 def start_gf_chat(message):
@@ -1386,13 +1399,18 @@ def handle_all_replies(message):
                 # Get context from group history
                 context = ""
                 if chat_id in group_chat_history:
+                    # Format all recent messages as context
                     context = "\n".join([
                         f"{msg['name']}: {msg['message']}" 
-                        for msg in group_chat_history[chat_id][-5:]  # Last 5 messages for context
+                        for msg in group_chat_history[chat_id][-10:]  # Last 10 messages for context
                     ])
                 
                 # Process response with context
-                process_therapy_response(message, single_user=False, context=context)
+                response = process_therapy_response(message, single_user=False, context=context)
+                
+                # Store bot's response in history
+                if response:
+                    store_bot_response(chat_id, response)
             else:
                 bot.reply_to(
                     message,
@@ -1782,11 +1800,13 @@ def update_conversation_activity(chat_id, user_id, user_name, message_text=None)
 
     # Store message in group history if provided
     if message_text:
+        # Store the message with user info
         group_chat_history[chat_id].append({
             'user_id': user_id,
             'name': user_name,
             'message': message_text,
-            'timestamp': current_time
+            'timestamp': current_time,
+            'is_bot': False
         })
         
         # Keep only last MAX_HISTORY_LENGTH messages
@@ -1796,6 +1816,21 @@ def update_conversation_activity(chat_id, user_id, user_name, message_text=None)
 # Add near other global variables at the top
 group_chat_history = defaultdict(list)  # Format: {chat_id: [{'user_id': id, 'name': name, 'message': text, 'timestamp': time}, ...]}
 MAX_HISTORY_LENGTH = 30  # Keep last 10 messages for context
+
+def store_bot_response(chat_id, response_text):
+    """Store bot's response in chat history"""
+    current_time = datetime.now()
+    group_chat_history[chat_id].append({
+        'user_id': bot.get_me().id,
+        'name': 'Girlfriend',
+        'message': response_text,
+        'timestamp': current_time,
+        'is_bot': True
+    })
+    
+    # Keep only last MAX_HISTORY_LENGTH messages
+    if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
+        group_chat_history[chat_id].pop(0)
 
 # Modify your main block to include the handler registration
 if __name__ == "__main__":
