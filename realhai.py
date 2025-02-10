@@ -915,7 +915,7 @@ def get_gemini_response(prompt, context_key=None):
         "If user asks questions give helpful answers while staying in character.\n\n"
         f"Previous conversation:\n{conversation_history}\n"
         f"Respond to: {prompt}"
-    ))
+    )
 
     data = {
         "contents": [{"parts": [{"text": enhanced_prompt}]}],
