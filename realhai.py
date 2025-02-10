@@ -1156,7 +1156,7 @@ def handle_game_commands(message):
     except Exception as e:
         logger.error(f"Error in game command handler: {str(e)}")
 
-def process_therapy_response(message, single_user=True):
+def process_therapy_response(message, single_user=True, context=None):
     """Process responses in therapy chat mode"""
     try:
         # First check if this is a reply to a game message
@@ -1380,9 +1380,19 @@ def handle_all_replies(message):
 
             # If user can join conversation
             if can_join_conversation(chat_id, user_id):
-                update_conversation_activity(chat_id, user_id, user_name)
-                process_therapy_response(message, 
-                                      single_user=(len(active_conversations[chat_id]['users']) == 1))
+                # Update with message text
+                update_conversation_activity(chat_id, user_id, user_name, message.text)
+                
+                # Get context from group history
+                context = ""
+                if chat_id in group_chat_history:
+                    context = "\n".join([
+                        f"{msg['name']}: {msg['message']}" 
+                        for msg in group_chat_history[chat_id][-5:]  # Last 5 messages for context
+                    ])
+                
+                # Process response with context
+                process_therapy_response(message, single_user=False, context=context)
             else:
                 bot.reply_to(
                     message,
@@ -1715,24 +1725,31 @@ def unblock_user_command(message):
         bot.reply_to(message, "ℹ️ An error occurred while unblocking the user.")
 
 def cleanup_inactive_users(chat_id):
-    """Remove users who haven't interacted in 5 minutes"""
+    """Remove users who haven't interacted in 5 minutes and clean old history"""
     if chat_id not in active_conversations:
         return
         
     current_time = datetime.now()
-    active_users = active_conversations[chat_id]['users']
+    
+    # Clean old history
+    if chat_id in group_chat_history:
+        # Remove messages older than CHAT_TIMEOUT
+        group_chat_history[chat_id] = [
+            msg for msg in group_chat_history[chat_id]
+            if (current_time - msg['timestamp']).total_seconds() <= CHAT_TIMEOUT
+        ]
     
     # Remove inactive users
     inactive_users = [
-        user_id for user_id, data in active_users.items()
+        user_id for user_id, data in active_conversations[chat_id]['users'].items()
         if (current_time - data['timestamp']).total_seconds() > USER_TIMEOUT
     ]
     
     for user_id in inactive_users:
-        del active_users[user_id]
+        del active_conversations[chat_id]['users'][user_id]
     
     # If no users left or chat inactive for 10 minutes, clear the conversation
-    if (not active_users or 
+    if (not active_conversations[chat_id]['users'] or 
         (current_time - active_conversations[chat_id]['last_activity']).total_seconds() > CHAT_TIMEOUT):
         del active_conversations[chat_id]
 
@@ -1747,8 +1764,8 @@ def can_join_conversation(chat_id, user_id):
     return (user_id in active_users or 
             len(active_users) < MAX_USERS_PER_CHAT)
 
-def update_conversation_activity(chat_id, user_id, user_name):
-    """Update user activity in conversation"""
+def update_conversation_activity(chat_id, user_id, user_name, message_text=None):
+    """Update user activity and store message history"""
     current_time = datetime.now()
     
     if chat_id not in active_conversations:
@@ -1762,6 +1779,23 @@ def update_conversation_activity(chat_id, user_id, user_name):
         'name': user_name
     }
     active_conversations[chat_id]['last_activity'] = current_time
+
+    # Store message in group history if provided
+    if message_text:
+        group_chat_history[chat_id].append({
+            'user_id': user_id,
+            'name': user_name,
+            'message': message_text,
+            'timestamp': current_time
+        })
+        
+        # Keep only last MAX_HISTORY_LENGTH messages
+        if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
+            group_chat_history[chat_id].pop(0)
+
+# Add near other global variables at the top
+group_chat_history = defaultdict(list)  # Format: {chat_id: [{'user_id': id, 'name': name, 'message': text, 'timestamp': time}, ...]}
+MAX_HISTORY_LENGTH = 30  # Keep last 10 messages for context
 
 # Modify your main block to include the handler registration
 if __name__ == "__main__":
