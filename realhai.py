@@ -935,12 +935,11 @@ def get_gemini_response(prompt, context_key):
     while len(tried_keys) < len(GEMINI_API_KEYS):
         api_key = get_available_api_key()
         if not api_key or api_key in tried_keys:
-            if len(tried_keys) < len(GEMINI_API_KEYS):
-                # If we haven't tried all keys, wait a bit and try again
-                time.sleep(1)
-                continue
-            logger.error("No more API keys available to try")
-            return None
+            if len(tried_keys) == len(GEMINI_API_KEYS):
+                logger.error("All API keys exhausted")
+                return None
+            time.sleep(1)
+            continue
             
         tried_keys.add(api_key)
         
@@ -1077,14 +1076,13 @@ def get_gemini_response(prompt, context_key):
             }
 
             response = requests.post(url, json=data, headers=headers, timeout=30)
-            response.raise_for_status()
+            
+            if response.status_code != 200:
+                logger.error(f"Error with API key {api_key}: {response.status_code} {response.text}")
+                continue
 
             response_json = response.json()
-            logger.debug("=" * 50)
-            logger.debug("RAW AI RESPONSE:")
-            logger.debug(response_json)
-            logger.debug("=" * 50)
-
+            
             # Extract text from response with better error handling
             if (response_json 
                 and "candidates" in response_json 
@@ -1099,10 +1097,6 @@ def get_gemini_response(prompt, context_key):
                     text = text.strip()
                     # Remove any system-like prefixes that might slip through
                     text = re.sub(r'^(Girlfriend:|AI:|Assistant:)\s*', '', text, flags=re.IGNORECASE)
-                    logger.debug("=" * 50)
-                    logger.debug("FINAL CLEANED RESPONSE:")
-                    logger.debug(text)
-                    logger.debug("=" * 50)
                     
                     # Track successful request
                     track_api_request(api_key)
@@ -1114,12 +1108,9 @@ def get_gemini_response(prompt, context_key):
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error with API key {api_key}: {str(e)}")
-            # Add a small delay before trying next key
-            time.sleep(1)
             continue
         except Exception as e:
             logger.error(f"Unexpected error with API key {api_key}: {str(e)}")
-            time.sleep(1)
             continue
             
     return None
