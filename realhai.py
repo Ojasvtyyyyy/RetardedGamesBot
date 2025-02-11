@@ -1860,6 +1860,7 @@ def update_conversation_activity(chat_id, user_id, user_name, message_text=None)
             'users': {},
             'last_activity': current_time
         }
+        group_chat_history[chat_id] = []  # Initialize empty history
     
     active_conversations[chat_id]['users'][user_id] = {
         'timestamp': current_time,
@@ -1867,19 +1868,24 @@ def update_conversation_activity(chat_id, user_id, user_name, message_text=None)
     }
     active_conversations[chat_id]['last_activity'] = current_time
 
-    # Store raw message in group history if provided
+    # Store message in group history if provided
     if message_text:
-        group_chat_history[chat_id].append({
-            'user_id': user_id,
-            'name': user_name,
-            'message': message_text,  # Store raw message without formatting
-            'timestamp': current_time,
-            'is_bot': False
-        })
-        
-        # Keep only last MAX_HISTORY_LENGTH messages
-        if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
-            group_chat_history[chat_id].pop(0)
+        # Check if this is a duplicate message
+        if not group_chat_history[chat_id] or \
+           group_chat_history[chat_id][-1]['message'] != message_text or \
+           group_chat_history[chat_id][-1]['user_id'] != user_id:
+            
+            group_chat_history[chat_id].append({
+                'user_id': user_id,
+                'name': user_name,
+                'message': message_text,
+                'timestamp': current_time,
+                'is_bot': False
+            })
+            
+            # Keep only last MAX_HISTORY_LENGTH messages
+            if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
+                group_chat_history[chat_id].pop(0)
 
 # Add near other global variables at the top
 group_chat_history = defaultdict(list)  # Format: {chat_id: [{'user_id': id, 'name': name, 'message': text, 'timestamp': time}, ...]}
@@ -1906,7 +1912,15 @@ def get_conversation_context(chat_id):
         return ""
         
     context = []
-    for msg in group_chat_history[chat_id][-10:]:  # Last 10 messages
+    current_speaker = None
+    messages = group_chat_history[chat_id][-20:]  # Last 10 messages
+    
+    for msg in messages:
+        # Skip consecutive messages from the same user
+        if current_speaker == msg['name']:
+            continue
+            
+        current_speaker = msg['name']
         if msg['is_bot']:
             context.append(f"Girlfriend: {msg['message']}")
         else:
