@@ -24,7 +24,6 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from flask import Flask, request, jsonify
 import re
-import json
 
 # Load environment variables
 load_dotenv()
@@ -1076,20 +1075,7 @@ def get_gemini_response(prompt, context_key):
                 }
             }
 
-            # Debug log the exact data being sent
-            logger.debug("=== GEMINI API REQUEST ===")
-            logger.debug(f"URL: {url}")
-            logger.debug(f"Headers: {headers}")
-            logger.debug(f"Data payload: {json.dumps(data, indent=2)}")
-            logger.debug("========================")
-
             response = requests.post(url, json=data, headers=headers, timeout=30)
-            
-            # Debug log the response
-            logger.debug("=== GEMINI API RESPONSE ===")
-            logger.debug(f"Status Code: {response.status_code}")
-            logger.debug(f"Response: {response.text}")
-            logger.debug("=========================")
             
             if response.status_code != 200:
                 logger.error(f"Error with API key {api_key}: {response.status_code} {response.text}")
