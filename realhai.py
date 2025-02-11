@@ -932,9 +932,13 @@ def get_gemini_response(prompt, context_key):
     # Try each API key until we get a successful response
     tried_keys = set()
     
-    while True:
+    while len(tried_keys) < len(GEMINI_API_KEYS):
         api_key = get_available_api_key()
         if not api_key or api_key in tried_keys:
+            if len(tried_keys) < len(GEMINI_API_KEYS):
+                # If we haven't tried all keys, wait a bit and try again
+                time.sleep(1)
+                continue
             logger.error("No more API keys available to try")
             return None
             
@@ -1024,8 +1028,17 @@ def get_gemini_response(prompt, context_key):
             if conversation_history:
                 chat_history = f"PREVIOUS CHAT CONTEXT:\n{conversation_history}\n\n"
 
-            # Finally add the current message to respond to
-            current_message = f"RESPOND TO THIS MESSAGE:\n{prompt}\n\n"
+            # Finally add the current message and important note
+            current_message = (
+                "CURRENT MESSAGE TO RESPOND TO:\n"
+                f"{prompt}\n\n"
+                "IMPORTANT NOTE:\n"
+                "- Keep previous chat in mind but respond naturally to this message\n"
+                "- Only reference previous context if directly relevant\n"
+                "- Never repeat messages or usernames in your response\n"
+                "- Respond in a natural conversational way\n"
+                "- Stay consistent with your previous statements\n"
+            )
 
             # Combine everything with clear separation
             enhanced_prompt = (
@@ -1033,9 +1046,6 @@ def get_gemini_response(prompt, context_key):
                 f"{group_context}"
                 f"{chat_history}"
                 f"{current_message}"
-                "IMPORTANT: Keep previous chat in mind but respond naturally to the current message. "
-                "Don't force previous context unless relevant. "
-                "Never repeat messages or usernames in your response."
             )
 
             data = {
@@ -1102,9 +1112,14 @@ def get_gemini_response(prompt, context_key):
             logger.error(f"Invalid response format from API key {api_key}")
             continue
 
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Error with API key {api_key}: {str(e)}")
-            # Continue to next API key regardless of error type
+            # Add a small delay before trying next key
+            time.sleep(1)
+            continue
+        except Exception as e:
+            logger.error(f"Unexpected error with API key {api_key}: {str(e)}")
+            time.sleep(1)
             continue
             
     return None
@@ -1869,7 +1884,10 @@ def update_conversation_activity(chat_id, user_id, user_name, message_text=None)
 
     # Store message in group history if provided
     if message_text:
-        # Store the message with user info
+        # Only store the "User says: message" format, not the raw message
+        if "says:" not in message_text:
+            message_text = f"{user_name} says: {message_text}"
+            
         group_chat_history[chat_id].append({
             'user_id': user_id,
             'name': user_name,
