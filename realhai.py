@@ -1469,30 +1469,16 @@ def handle_all_replies(message):
         if current_mode == CHAT_MODE:
             cleanup_inactive_users(chat_id)
             
-            # If no active conversation, start new one
-            if chat_id not in active_conversations:
-                update_conversation_activity(chat_id, user_id, user_name)
-                process_therapy_response(message, single_user=True)
-                return
-
-            # If user can join conversation
             if can_join_conversation(chat_id, user_id):
-                # Update with message text
+                # Update with raw message text
                 update_conversation_activity(chat_id, user_id, user_name, message.text)
                 
-                # Get context from group history
-                context = ""
-                if chat_id in group_chat_history:
-                    # Format all recent messages as context
-                    context = "\n".join([
-                        f"{msg['name']}: {msg['message']}" 
-                        for msg in group_chat_history[chat_id][-10:]  # Last 10 messages for context
-                    ])
+                # Get properly formatted context
+                context = get_conversation_context(chat_id)
                 
                 # Process response with context
                 response = process_therapy_response(message, single_user=False, context=context)
                 
-                # Store bot's response in history
                 if response:
                     store_bot_response(chat_id, response)
             else:
@@ -1867,7 +1853,6 @@ def can_join_conversation(chat_id, user_id):
             len(active_users) < MAX_USERS_PER_CHAT)
 
 def update_conversation_activity(chat_id, user_id, user_name, message_text=None):
-    """Update user activity and store message history"""
     current_time = datetime.now()
     
     if chat_id not in active_conversations:
@@ -1882,16 +1867,12 @@ def update_conversation_activity(chat_id, user_id, user_name, message_text=None)
     }
     active_conversations[chat_id]['last_activity'] = current_time
 
-    # Store message in group history if provided
+    # Store raw message in group history if provided
     if message_text:
-        # Only store the "User says: message" format, not the raw message
-        if "says:" not in message_text:
-            message_text = f"{user_name} says: {message_text}"
-            
         group_chat_history[chat_id].append({
             'user_id': user_id,
             'name': user_name,
-            'message': message_text,
+            'message': message_text,  # Store raw message without formatting
             'timestamp': current_time,
             'is_bot': False
         })
@@ -1918,6 +1899,20 @@ def store_bot_response(chat_id, response_text):
     # Keep only last MAX_HISTORY_LENGTH messages
     if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
         group_chat_history[chat_id].pop(0)
+
+def get_conversation_context(chat_id):
+    """Get formatted conversation context"""
+    if chat_id not in group_chat_history:
+        return ""
+        
+    context = []
+    for msg in group_chat_history[chat_id][-10:]:  # Last 10 messages
+        if msg['is_bot']:
+            context.append(f"Girlfriend: {msg['message']}")
+        else:
+            context.append(f"{msg['name']}: {msg['message']}")
+            
+    return "\n".join(context)
 
 # Modify your main block to include the handler registration
 if __name__ == "__main__":
