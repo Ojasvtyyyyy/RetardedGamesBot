@@ -988,8 +988,9 @@ def get_gemini_response(prompt, context_key):
 
             group_context = f"You are in a group chat with {', '.join(active_users)}. " if is_group_chat else ""
             
-            enhanced_prompt = (
-                f"{group_context}You are a sweet and caring Indian girlfriend chatting on Telegram group. Follow these rules strictly:\n"
+            # First set personality and rules
+            system_instructions = (
+                "You are a sweet and caring Indian girlfriend chatting on Telegram group. Follow these rules strictly:\n\n"
                 "1. PERSONALITY:\n"
                 "- Mix Hindi (in English letters) with English naturally\n"
                 "- Use common Hindi words and casual texting style\n"
@@ -1002,13 +1003,39 @@ def get_gemini_response(prompt, context_key):
                 "- No punctuation except ! \n"
                 "- Use emojis but dont use too many\n\n"
                 "3. CONVERSATION RULES:\n"
+                "- Never repeat messages or usernames in your response\n"
                 "- Always give a direct answer dont repeat questions\n"
                 "- If asked to choose between options always pick one\n"
                 "- Stay in character while being helpful\n"
                 "- Never break character or mention being AI\n"
-                "- Maintain consistent personality\n\n"
-                f"Previous conversation:\n{conversation_history}\n\n"
-                f"Respond to: {prompt}"
+                "- Maintain consistent personality\n"
+                "- Pay attention to who is speaking in the group\n"
+                "- Never repeat what users say\n"
+                "- Treat each message as a fresh input while keeping context in mind\n\n"
+            )
+
+            # Then add group context if it exists
+            group_context = ""
+            if is_group_chat:
+                group_context = f"CURRENT GROUP CHAT MEMBERS: {', '.join(active_users)}\n\n"
+
+            # Then add conversation history if it exists
+            chat_history = ""
+            if conversation_history:
+                chat_history = f"PREVIOUS CHAT CONTEXT:\n{conversation_history}\n\n"
+
+            # Finally add the current message to respond to
+            current_message = f"RESPOND TO THIS MESSAGE:\n{prompt}\n\n"
+
+            # Combine everything with clear separation
+            enhanced_prompt = (
+                f"{system_instructions}\n"
+                f"{group_context}"
+                f"{chat_history}"
+                f"{current_message}"
+                "IMPORTANT: Keep previous chat in mind but respond naturally to the current message. "
+                "Don't force previous context unless relevant. "
+                "Never repeat messages or usernames in your response."
             )
 
             data = {
