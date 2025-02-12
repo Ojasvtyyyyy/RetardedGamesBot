@@ -261,7 +261,7 @@ def create_agreement_keyboard():
     )
     return keyboard
 
-def send_terms_and_conditions(chat_id):
+def send_terms_and_conditions(chat_id, message):
     """Send terms and conditions in multiple messages"""
     try:
         # Get chat info
@@ -379,7 +379,7 @@ Click below to accept or decline:"""
             
     except Exception as e:
         logger.error(f"Error sending terms: {str(e)}")
-        bot.reply_to(message, "Error displaying terms. Please try again later.")
+        bot.send_message(chat_id, "Error displaying terms. Please try again later.")
 
 def get_user_name(message):
     """Get user's first name or username"""
@@ -1431,7 +1431,7 @@ def start_gf_chat(message):
         # Check terms agreement
         if not db.has_user_agreed(user_id):
             logger.info(f"User {user_id} needs to agree to terms")
-            return send_terms_and_conditions(chat_id)
+            return send_terms_and_conditions(chat_id, message)
 
         # Check rate limit
         if not check_rate_limit(user_id):
@@ -1471,7 +1471,7 @@ def start_gf_chat(message):
         bot.reply_to(message, opening_message)
 
     except Exception as e:
-        logger.error(f"Error in gf command: {str(e)}", exc_info=True)
+        logger.error(f"Error in gf command: {str(e)}")
         bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=user_name))
 
 @bot.callback_query_handler(func=lambda call: call.data in ["agree_terms", "disagree_terms"])
