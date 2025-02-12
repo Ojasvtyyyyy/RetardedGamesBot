@@ -3,7 +3,7 @@ import pandas as pd
 import random
 import logging
 from typing import Optional
-from telebot.apihelper import ApiTelegramException
+from telebot.apihelper import ApiTelegramException, ApiException
 import requests.exceptions
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -14,7 +14,7 @@ import requests
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 import os
-from requests.exceptions import ProxyError, ConnectionError
+from requests.exceptions import ProxyError, ConnectionError, TimeoutError
 import socket
 from os import environ
 from dotenv import load_dotenv
@@ -24,6 +24,7 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from flask import Flask, request, jsonify
 import re
+from functools import wraps
 
 # Load environment variables
 load_dotenv()
@@ -34,6 +35,14 @@ GEMINI_API_KEY_1 = environ.get('GEMINI_API_KEY_1')
 GEMINI_API_KEY_2 = environ.get('GEMINI_API_KEY_2')
 GEMINI_API_KEY_3 = environ.get('GEMINI_API_KEY_3')
 GEMINI_API_KEY_4 = environ.get('GEMINI_API_KEY_4')
+
+# Network-related configurations
+TELEGRAM_REQUEST_TIMEOUT = 30  # seconds
+MAX_RETRIES = 3
+RETRY_DELAY = 1  # seconds
+
+# Configure telebot with timeout
+telebot.apihelper.CONNECT_TIMEOUT = TELEGRAM_REQUEST_TIMEOUT
 
 GEMINI_API_KEYS = [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3, GEMINI_API_KEY_4]
 
@@ -292,23 +301,47 @@ def send_terms_and_conditions(chat_id):
 - You understand this is a binding agreement
 
 Click below to accept or decline:"""
-        ]
-        
-        # Send each part with a small delay
-        for part in terms_parts:
-            bot.send_message(chat_id, part)
-            time.sleep(0.5)  # Small delay between messages
+                ]
+                
+                # Send each part with a small delay
+                for part in terms_parts:
+                    bot.send_message(user_id, part)
+                    time.sleep(0.5)  # Small delay between messages
+                    
+                # Send the final message with the agreement buttons
+                bot.send_message(
+                    user_id,
+                    "ℹ️ Do you agree to all the terms and conditions?",
+                    reply_markup=create_agreement_keyboard()
+                )
+                
+            except ApiException as e:
+                # If bot can't DM user
+                bot.reply_to(message,
+                    "❌ I couldn't send you a DM! Please start a private chat with me first.")
+                logger.error(f"Failed to send DM: {str(e)}")
+                return
+                
+        else:
+            # For private chats, send terms directly
+            # Existing terms sending logic
+            bot.send_message(chat_id, 
+                "ℹ️ @RetardedGamesBotDevBot Terms and Conditions\n\n"
+                "Please read all terms carefully:")
             
-        # Send the final message with the agreement buttons
-        bot.send_message(
-            chat_id,
-            "ℹ️ Do you agree to all the terms and conditions?",
-            reply_markup=create_agreement_keyboard()
-        )
-        
+            for part in terms_parts:
+                bot.send_message(chat_id, part)
+                time.sleep(0.5)
+                
+            bot.send_message(
+                chat_id,
+                "ℹ️ Do you agree to all the terms and conditions?",
+                reply_markup=create_agreement_keyboard()
+            )
+            
     except Exception as e:
         logger.error(f"Error sending terms: {str(e)}")
-        bot.send_message(chat_id, "Error displaying terms. Please try again later.")
+        bot.reply_to(message, "Error displaying terms. Please try again later.")
 
 def get_user_name(message):
     """Get user's first name or username"""
@@ -606,6 +639,7 @@ def send_about(message):
         logger.error(f"Error in send_about: {str(e)}")
         bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
 
+@retry_on_network_error()
 def create_game_handler(game_type, emoji):
     """Create a handler for game commands"""
     def handler(message):
@@ -613,7 +647,7 @@ def create_game_handler(game_type, emoji):
             chat_id = message.chat.id
             logger.debug(f"Game command received in chat {chat_id}")
 
-            # Always switch to game mode and end conversations, regardless of current state
+            # Always switch to game mode and end conversations
             set_chat_mode(chat_id, GAME_MODE)
             if chat_id in active_conversations:
                 logger.debug(f"Ending active conversation in chat {chat_id}")
@@ -622,24 +656,34 @@ def create_game_handler(game_type, emoji):
             # Clear any pending next step handlers
             bot.clear_step_handler_by_chat_id(chat_id)
 
-            # Rest of the game handler code...
+            # Handle group chat commands
             if message.chat.type in ['group', 'supergroup']:
                 command = message.text.split('@')[0][1:]
                 if '@' in message.text and not message.text.endswith(f'@{bot.get_me().username}'):
                     return
 
-            # Reload the CSV before getting a question
-            game_reader.reload_csv(game_type)
-            
-            question = game_reader.get_random_question(game_type)
-            if question:
-                bot.reply_to(message, f"{emoji} {question}")
-            else:
-                bot.reply_to(message, "Sorry, couldn't get a question. Please try again!")
+            try:
+                # Reload the CSV before getting a question
+                game_reader.reload_csv(game_type)
+                question = game_reader.get_random_question(game_type)
+                
+                if question:
+                    return bot.reply_to(message, f"{emoji} {question}")
+                else:
+                    return bot.reply_to(message, "Sorry, couldn't get a question. Please try again!")
 
+            except telebot.apihelper.ApiException as api_error:
+                logger.error(f"Telegram API error in game handler: {str(api_error)}")
+                raise
+                
+            except requests.exceptions.RequestException as req_error:
+                logger.error(f"Network error in game handler: {str(req_error)}")
+                raise
+                
         except Exception as e:
             logger.error(f"Error in {game_type} command: {str(e)}")
             bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
+            
     return handler
 
 @bot.message_handler(commands=['register'])
@@ -1393,45 +1437,59 @@ def start_gf_chat(message):
         bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=user_name))
 
 @bot.callback_query_handler(func=lambda call: call.data in ["agree_terms", "disagree_terms"])
-def handle_agreement(call):
-    """Handle user's agreement choice"""
+def handle_terms_agreement(call):
     try:
         user_id = call.from_user.id
         chat_id = call.message.chat.id
         
+        # Get original chat type from database or context
+        original_chat_type = db.get_user_original_chat_type(user_id)
+        
         if call.data == "agree_terms":
-            # Save user agreement
-            success = db.save_user_agreement(
+            # Save agreement
+            db.save_user_agreement(
                 user_id=user_id,
                 username=call.from_user.username,
                 first_name=call.from_user.first_name,
                 last_name=call.from_user.last_name,
-                chat_id=chat_id,
-                chat_type=call.message.chat.type
+                chat_id=original_chat_type.get('chat_id', chat_id),
+                chat_type=original_chat_type.get('chat_type', 'private')
             )
             
-            if success:
+            # If this was from a group chat, send confirmation in both places
+            if original_chat_type.get('chat_type') in ['group', 'supergroup']:
+                # Confirm in DM
                 bot.edit_message_text(
-                    "ℹ️ Thank you for agreeing to the terms! You can now use the /gf command.",
-                    chat_id=chat_id,
+                    "ℹ️ Terms accepted! You can now use the bot in the group.",
+                    chat_id=user_id,
                     message_id=call.message.message_id
                 )
+                # Confirm in original group
+                bot.send_message(
+                    original_chat_type['chat_id'],
+                    f"ℹ️ @{call.from_user.username or call.from_user.first_name} has accepted the terms!"
+                )
             else:
+                # Just edit the message in private chat
                 bot.edit_message_text(
-                    "ℹ️ Error saving agreement. Please try again later.",
+                    "ℹ️ Terms accepted! You can now use the bot.",
                     chat_id=chat_id,
                     message_id=call.message.message_id
                 )
         else:
+            # Handle disagreement
             bot.edit_message_text(
-                "ℹ️ You must agree to the terms to use the /gf feature.",
+                "ℹ️ You must accept the terms to use the bot.",
                 chat_id=chat_id,
                 message_id=call.message.message_id
             )
             
     except Exception as e:
-        logger.error(f"Error handling agreement: {str(e)}")
-        bot.answer_callback_query(call.id, "An error occurred. Please try again.")
+        logger.error(f"Error handling terms agreement: {str(e)}")
+        bot.answer_callback_query(
+            call.id,
+            "Sorry, something went wrong. Please try again."
+        )
 
 @bot.message_handler(func=lambda message: message.reply_to_message
                     and message.reply_to_message.from_user.id == bot.get_me().id)
@@ -1587,16 +1645,25 @@ def handle_all_messages(message):
         if message.text and message.text.startswith('/'):
             return
 
-        # If it's a reply to bot, handle it
-        try:
-            if (message.reply_to_message and 
-                message.reply_to_message.from_user and 
-                message.reply_to_message.from_user.id == bot.get_me().id):
+        # If it's a reply to bot, handle it with proper error handling
+        if (message.reply_to_message and 
+            message.reply_to_message.from_user and 
+            message.reply_to_message.from_user.id == bot.get_me().id):
+            
+            try:
                 handle_all_replies(message)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error in handle_all_messages: {str(e)}")
-            bot.reply_to(message, "Sorry, I'm having connection issues. Please try again in a moment.")
-            return
+            except telebot.apihelper.ApiException as api_error:
+                logger.error(f"Telegram API error: {str(api_error)}")
+                bot.reply_to(message, "Sorry, having trouble connecting to Telegram. Please try again.")
+                raise
+            except requests.exceptions.RequestException as req_error:
+                logger.error(f"Network error: {str(req_error)}")
+                bot.reply_to(message, "Sorry, having connection issues. Please try again in a moment.")
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error: {str(e)}")
+                bot.reply_to(message, "Sorry, something went wrong. Please try again.")
+                raise
 
     except Exception as e:
         logger.error(f"Error in handle_all_messages: {str(e)}")
@@ -2016,3 +2083,25 @@ if __name__ == "__main__":
             
     except Exception as e:
         logger.error(f"Bot error: {str(e)}")
+
+def retry_on_network_error(max_retries=3, delay=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except (requests.exceptions.RequestException, 
+                        telebot.apihelper.ApiException,
+                        ConnectionError,
+                        TimeoutError) as e:
+                    retries += 1
+                    if retries == max_retries:
+                        logger.error(f"Failed after {max_retries} retries: {str(e)}")
+                        raise
+                    logger.warning(f"Attempt {retries} failed, retrying in {delay} seconds...")
+                    time.sleep(delay)
+            return None
+        return wrapper
+    return decorator
