@@ -41,6 +41,29 @@ TELEGRAM_REQUEST_TIMEOUT = 30  # seconds
 MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
 
+def retry_on_network_error(max_retries=3, delay=1):
+    """Decorator for safe API requests"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            retries = 0
+            while retries < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except (requests.exceptions.RequestException, 
+                        telebot.apihelper.ApiException,
+                        ConnectionError,
+                        ReadTimeout) as e:
+                    retries += 1
+                    if retries == max_retries:
+                        logger.error(f"Failed after {max_retries} retries: {str(e)}")
+                        raise
+                    logger.warning(f"Attempt {retries} failed, retrying in {delay} seconds...")
+                    time.sleep(delay)
+            return None
+        return wrapper
+    return decorator
+
 # Configure telebot with timeout
 telebot.apihelper.CONNECT_TIMEOUT = TELEGRAM_REQUEST_TIMEOUT
 
