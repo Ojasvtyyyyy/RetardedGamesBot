@@ -423,5 +423,48 @@ class Database:
             logger.error(f"Error getting chat history for prompt: {str(e)}")
             return ""
 
+    def get_user_original_chat_type(self, user_id: int):
+        """Get the original chat type where user started terms agreement"""
+        try:
+            if self.db is None:
+                logger.warning("Database not available")
+                return {}
+            
+            collection = self.db.user_chat_types
+            result = collection.find_one({"user_id": user_id})
+            if result:
+                return {
+                    'chat_id': result.get('chat_id'),
+                    'chat_type': result.get('chat_type')
+                }
+            return {}
+        except Exception as e:
+            logger.error(f"Error getting user chat type: {str(e)}")
+            return {}
+
+    def save_user_chat_type(self, user_id: int, chat_id: int, chat_type: str):
+        """Save the original chat type where user started terms agreement"""
+        try:
+            if self.db is None:
+                logger.error("Database not available")
+                return False
+            
+            collection = self.db.user_chat_types
+            result = collection.update_one(
+                {"user_id": user_id},
+                {
+                    "$set": {
+                        "chat_id": chat_id,
+                        "chat_type": chat_type,
+                        "updated_at": datetime.now()
+                    }
+                },
+                upsert=True
+            )
+            return result.modified_count > 0 or result.upserted_id is not None
+        except Exception as e:
+            logger.error(f"Error saving user chat type: {str(e)}")
+            return False
+
 # Create a singleton instance
 db = Database()
