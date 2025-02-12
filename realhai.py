@@ -361,7 +361,7 @@ Click below to accept or decline:"""
             except ApiException as e:
                 # If bot can't DM user
                 bot.reply_to(message,
-                    "❌ I couldn't send you a DM! Please start a private chat with me first.")
+                    "ℹ️ I couldn't send you a DM! Please start a private chat with me first.")
                 logger.error(f"Failed to send DM: {str(e)}")
                 return
                 
