@@ -337,7 +337,7 @@ Click below to accept or decline:"""
             
             # Send initial message in group
             bot.reply_to(message, 
-                "📝 Please check your DM to accept the terms and conditions first!")
+                "ℹ️ Please check your DM to accept the terms and conditions first!")
             
             # Send terms in DM
             try:
