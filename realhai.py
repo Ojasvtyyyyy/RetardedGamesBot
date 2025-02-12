@@ -241,8 +241,8 @@ def create_agreement_keyboard():
 def send_terms_and_conditions(chat_id):
     """Send terms and conditions in multiple messages"""
     try:
-        # First message with intro
-        bot.send_message(chat_id, "ℹ️ @RetardedGamesBotDevBot Terms and Conditions\n\nPlease read all terms carefully:")
+        # Get chat info
+        chat = bot.get_chat(chat_id)
         
         # Split terms into smaller chunks
         terms_parts = [
@@ -301,14 +301,30 @@ def send_terms_and_conditions(chat_id):
 - You understand this is a binding agreement
 
 Click below to accept or decline:"""
-                ]
+        ]
+        
+        # If this is a group chat (normal or forum/topic), send terms in DM
+        if chat.type in ['group', 'supergroup']:
+            # Get the user who triggered the command
+            user_id = message.from_user.id
+            
+            # Send initial message in group
+            bot.reply_to(message, 
+                "📝 Please check your DM to accept the terms and conditions first!")
+            
+            # Send terms in DM
+            try:
+                # First message with intro
+                bot.send_message(user_id, 
+                    "ℹ️ @RetardedGamesBotDevBot Terms and Conditions\n\n"
+                    "Please read all terms carefully:")
                 
                 # Send each part with a small delay
                 for part in terms_parts:
                     bot.send_message(user_id, part)
-                    time.sleep(0.5)  # Small delay between messages
+                    time.sleep(0.5)
                     
-                # Send the final message with the agreement buttons
+                # Send agreement buttons in DM
                 bot.send_message(
                     user_id,
                     "ℹ️ Do you agree to all the terms and conditions?",
@@ -324,7 +340,6 @@ Click below to accept or decline:"""
                 
         else:
             # For private chats, send terms directly
-            # Existing terms sending logic
             bot.send_message(chat_id, 
                 "ℹ️ @RetardedGamesBotDevBot Terms and Conditions\n\n"
                 "Please read all terms carefully:")
