@@ -14,7 +14,7 @@ import requests
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 import os
-from requests.exceptions import ProxyError, ConnectionError, TimeoutError
+from requests.exceptions import ProxyError, ConnectionError, ReadTimeout
 import socket
 from os import environ
 from dotenv import load_dotenv
@@ -2110,7 +2110,7 @@ def retry_on_network_error(max_retries=3, delay=1):
                 except (requests.exceptions.RequestException, 
                         telebot.apihelper.ApiException,
                         ConnectionError,
-                        TimeoutError) as e:
+                        ReadTimeout) as e:
                     retries += 1
                     if retries == max_retries:
                         logger.error(f"Failed after {max_retries} retries: {str(e)}")
