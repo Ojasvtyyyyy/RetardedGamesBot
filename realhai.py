@@ -266,6 +266,10 @@ def send_terms_and_conditions(chat_id, message):
     try:
         # Get chat info
         chat = bot.get_chat(chat_id)
+        user_id = message.from_user.id
+        
+        # Save original chat type
+        db.save_user_chat_type(user_id, chat_id, chat.type)
         
         # Split terms into smaller chunks
         terms_parts = [
