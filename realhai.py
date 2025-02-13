@@ -37,9 +37,9 @@ GEMINI_API_KEY_3 = environ.get('GEMINI_API_KEY_3')
 GEMINI_API_KEY_4 = environ.get('GEMINI_API_KEY_4')
 
 # Network-related configurations
-TELEGRAM_REQUEST_TIMEOUT = 30  # seconds
-MAX_RETRIES = 3
-RETRY_DELAY = 1  # seconds
+TELEGRAM_REQUEST_TIMEOUT = 60  # Increase from 30 to 60 seconds
+MAX_RETRIES = 5  # Increase from 3 to 5
+RETRY_DELAY = 2  # Increase from 1 to 2 seconds
 
 def retry_on_network_error(max_retries=3, delay=1):
     """Decorator for safe API requests"""
@@ -64,8 +64,9 @@ def retry_on_network_error(max_retries=3, delay=1):
         return wrapper
     return decorator
 
-# Configure telebot with timeout
+# Configure telebot with increased timeout
 telebot.apihelper.CONNECT_TIMEOUT = TELEGRAM_REQUEST_TIMEOUT
+telebot.apihelper.READ_TIMEOUT = TELEGRAM_REQUEST_TIMEOUT
 
 GEMINI_API_KEYS = [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3, GEMINI_API_KEY_4]
 
@@ -390,13 +391,12 @@ def get_user_name(message):
     return message.from_user.first_name or message.from_user.username or "baby"
 
 def create_bot_session():
-    """Create a session with retry logic"""
     session = requests.Session()
     retry_strategy = Retry(
-        total=5,  # number of retries
-        backoff_factor=0.5,  # wait time between retries
-        status_forcelist=[500, 502, 503, 504, 429],  # status codes to retry on
-        allowed_methods=["GET", "POST"],  # methods to retry
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "POST"]
     )
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("http://", adapter)
@@ -1038,7 +1038,7 @@ def get_gemini_response(prompt, context_key):
             if context_key and context_key in user_contexts:
                 logger.debug(f"Getting context for key: {context_key}")
                 # Get last 30 messages for full conversation context
-                recent_messages = user_contexts[context_key]['conversation'][-30:]
+                recent_messages = user_contexts[context_key]['conversation'][-8:]
                 logger.debug(f"Recent messages count: {len(recent_messages)}")
                 
                 for msg in recent_messages:
@@ -1534,10 +1534,17 @@ def handle_terms_agreement(call):
         )
 
 @bot.message_handler(func=lambda message: message.reply_to_message
+                    and message.reply_to_message.from_user
                     and message.reply_to_message.from_user.id == bot.get_me().id)
 def handle_all_replies(message):
     """Handle all replies to bot messages with multi-user support"""
     try:
+        # Additional verification to ensure it's actually a reply to the bot
+        if not (message.reply_to_message and 
+                message.reply_to_message.from_user and 
+                message.reply_to_message.from_user.id == bot.get_me().id):
+            return
+
         chat_id = message.chat.id
         user_id = message.from_user.id
         user_name = get_user_name(message)
