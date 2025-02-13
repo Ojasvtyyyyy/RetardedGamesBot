@@ -1352,54 +1352,67 @@ def process_therapy_response(message, single_user=True, context=None):
         # Update last interaction time
         update_conversation_activity(chat_id, user_id, get_user_name(message))
 
+        # Base prompt that's common for both single and group chats
+        base_prompt = (
+            "You are a sweet and caring Indian girlfriend chatting on Telegram. Follow these rules:\n"
+            "1. Mix Hindi (in English letters) with English naturally\n"
+            "2. Use sweet nicknames and be playful\n"
+            "3. Keep responses short (2-5 lines)\n"
+            "4. If user asks a question, give a direct answer, don't reply with another question\n"
+            "5. Stay in character while being helpful\n\n"
+        )
+
         # Get or create context key
         context_key = f"{chat_id}_{user_id}"
-        if context_key not in user_contexts:
-            user_contexts[context_key] = {
-                'conversation': [],
-                'timestamp': datetime.now()
-            }
-
-        # Prepare context based on single/group chat
+        
+        # Handle context only for single user chats
         if single_user:
-            enhanced_prompt = message.text
-        else:
-            # Get all active users in the conversation
-            active_users = active_conversations[chat_id]['users']
-            users_context = ", ".join(data['name'] for data in active_users.values())
-            
-            # Include the full conversation context if provided
-            if context:
-                enhanced_prompt = (
-                    f"Group chat with users: {users_context}\n"
-                    f"Previous conversation:\n{context}\n"
-                    f"{get_user_name(message)} says: {message.text}"
-                )
-            else:
-                enhanced_prompt = (
-                    f"Group chat with users: {users_context}\n"
-                    f"{get_user_name(message)} says: {message.text}"
-                )
+            if context_key not in user_contexts:
+                user_contexts[context_key] = {
+                    'conversation': [],
+                    'timestamp': datetime.now()
+                }
+            elif len(user_contexts[context_key]['conversation']) > 10:
+                user_contexts[context_key]['conversation'] = \
+                    user_contexts[context_key]['conversation'][-5:]
 
-        # Add user message to context
-        user_contexts[context_key]['conversation'].append({
-            'role': 'user',
-            'content': enhanced_prompt,
-            'username': get_user_name(message)
-        })
+            # Add current message to context
+            user_contexts[context_key]['conversation'].append({
+                'role': 'user',
+                'content': message.text,
+                'username': get_user_name(message)
+            })
+            
+            # Get recent context
+            recent_context = user_contexts[context_key]['conversation'][-5:]
+            context_str = "\n".join([f"{'User' if msg['role'] == 'user' else 'You'}: {msg['content']}" 
+                                   for msg in recent_context[:-1]])
+            
+            enhanced_prompt = (
+                f"{base_prompt}"
+                f"Previous chat:\n{context_str}\n\n"
+                f"Current message: {message.text}"
+            )
+        else:
+            # For group chats - no context, just the current message
+            enhanced_prompt = (
+                f"{base_prompt}"
+                f"Current message from {get_user_name(message)}: {message.text}"
+            )
 
         # Try to get AI response with retries
         max_retries = 3
         ai_response = None
         for attempt in range(max_retries):
             logger.debug(f"Attempt {attempt + 1} to get AI response")
-            ai_response = get_gemini_response(enhanced_prompt, context_key)
+            ai_response = get_gemini_response(enhanced_prompt, context_key if single_user else None)
             if ai_response:
-                # Add AI response to context
-                user_contexts[context_key]['conversation'].append({
-                    'role': 'assistant',
-                    'content': ai_response
-                })
+                # Add AI response to context only for single user chats
+                if single_user:
+                    user_contexts[context_key]['conversation'].append({
+                        'role': 'assistant',
+                        'content': ai_response
+                    })
                 log_interaction(message, ai_response)  # Log the interaction
                 bot.reply_to(message, ai_response)
                 logger.debug("Sent AI response")
@@ -1414,7 +1427,7 @@ def process_therapy_response(message, single_user=True, context=None):
             return None
 
     except Exception as e:
-        logger.error(f"Error in therapy response: {str(e)}", exc_info=True)
+        logger.error(f"Error in process_therapy_response: {str(e)}", exc_info=True)
         error_cooldowns[user_id] = time.time()
         bot.reply_to(message, random.choice(GENERAL_ERROR_MESSAGES).format(name=get_user_name(message)))
         return None
