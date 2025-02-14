@@ -1320,7 +1320,13 @@ def handle_game_commands(message):
 def process_therapy_response(message, single_user=True, context=None):
     """Process responses in therapy chat mode"""
     try:
-        # First check if this is a reply to a game message
+        # First check if user has accepted terms
+        user_id = message.from_user.id
+        if not db.has_user_agreed(user_id):
+            logger.info(f"User {user_id} needs to agree to terms")
+            return send_terms_and_conditions(message.chat.id, message)
+
+        # Rest of your existing checks...
         if message.reply_to_message and message.reply_to_message.text:
             is_game = is_game_response(message.reply_to_message.text)
             logger.debug(f"Checking if reply is to game message: {is_game}")
@@ -1365,16 +1371,17 @@ def process_therapy_response(message, single_user=True, context=None):
         # Get or create context key
         context_key = f"{chat_id}_{user_id}"
         
-        # Handle context only for single user chats
+        # Handle context differently for single user and group chats
         if single_user:
+            # Store message in database
+            db.store_user_context(chat_id, user_id, message.text)
+            
+            # Initialize context if not exists
             if context_key not in user_contexts:
                 user_contexts[context_key] = {
                     'conversation': [],
                     'timestamp': datetime.now()
                 }
-            elif len(user_contexts[context_key]['conversation']) > 10:
-                user_contexts[context_key]['conversation'] = \
-                    user_contexts[context_key]['conversation'][-5:]
 
             # Add current message to context
             user_contexts[context_key]['conversation'].append({
@@ -1382,19 +1389,27 @@ def process_therapy_response(message, single_user=True, context=None):
                 'content': message.text,
                 'username': get_user_name(message)
             })
+
+            # Get recent context from both memory and database
+            recent_memory = user_contexts[context_key]['conversation'][-5:] if len(user_contexts[context_key]['conversation']) > 0 else []
+            db_context = db.get_chat_history_for_prompt(chat_id)
             
-            # Get recent context
-            recent_context = user_contexts[context_key]['conversation'][-5:]
-            context_str = "\n".join([f"{'User' if msg['role'] == 'user' else 'You'}: {msg['content']}" 
-                                   for msg in recent_context[:-1]])
-            
+            # Combine contexts
+            context_str = ""
+            if db_context:
+                context_str += f"{db_context}\n"
+            if recent_memory:
+                memory_str = "\n".join([f"{'User' if msg['role'] == 'user' else 'You'}: {msg['content']}" 
+                                    for msg in recent_memory[:-1]])
+                context_str += memory_str
+
             enhanced_prompt = (
                 f"{base_prompt}"
                 f"Previous chat:\n{context_str}\n\n"
                 f"Current message: {message.text}"
             )
         else:
-            # For group chats - no context, just the current message
+            # For group chats - use the existing context system
             enhanced_prompt = (
                 f"{base_prompt}"
                 f"Current message from {get_user_name(message)}: {message.text}"
@@ -1413,6 +1428,8 @@ def process_therapy_response(message, single_user=True, context=None):
                         'role': 'assistant',
                         'content': ai_response
                     })
+                    # Also store in database
+                    db.store_user_context(chat_id, bot.get_me().id, ai_response)
                 log_interaction(message, ai_response)  # Log the interaction
                 bot.reply_to(message, ai_response)
                 logger.debug("Sent AI response")
@@ -1703,14 +1720,16 @@ def get_chat_mode(chat_id: int) -> str:
 def handle_all_messages(message):
     """Handle all incoming messages"""
     try:
-        # If it's a command, process it
+        # If it's a command, ignore it
         if message.text and message.text.startswith('/'):
             return
 
-        # If it's a reply to bot, handle it with proper error handling
-        if (message.reply_to_message and 
-            message.reply_to_message.from_user and 
-            message.reply_to_message.from_user.id == bot.get_me().id):
+        # Only process messages that are direct replies to the bot
+        if message.reply_to_message:
+            if not (message.reply_to_message.from_user and 
+                   message.reply_to_message.from_user.id == bot.get_me().id):
+                # If it's a reply but not to the bot, ignore it
+                return
             
             try:
                 handle_all_replies(message)
@@ -1729,10 +1748,12 @@ def handle_all_messages(message):
 
     except Exception as e:
         logger.error(f"Error in handle_all_messages: {str(e)}")
-        try:
-            bot.reply_to(message, "Sorry, something went wrong. Please try again.")
-        except:
-            logger.error("Failed to send error message to user")
+        # Only send error message if it was meant for the bot
+        if message.reply_to_message and message.reply_to_message.from_user.id == bot.get_me().id:
+            try:
+                bot.reply_to(message, "Padhle bsdk.")
+            except:
+                logger.error("Failed to send error message to user")
 
 def log_interaction(message, response=None):
     """Log user interactions to database"""
@@ -1780,8 +1801,8 @@ def check_password(message):
             return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
             
         if message.text == "iamgay123@#":
-            # Get history from database
-            history = db.get_chat_history(100)
+            # Get ALL history from database (no limit)
+            history = db.get_chat_history(0)  # 0 means no limit
             if history:
                 history_text = "ℹ️ Chat History:\n\n"
                 for entry in history:
