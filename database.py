@@ -166,7 +166,10 @@ class Database:
     def get_chat_history(self, limit: int = 100):
         try:
             collection = self.db.chat_history
-            cursor = collection.find().sort("timestamp", -1).limit(limit)
+            # If limit is 0, don't apply any limit
+            cursor = collection.find().sort("timestamp", -1)
+            if limit > 0:
+                cursor = cursor.limit(limit)
             return list(cursor)
         except Exception as e:
             logger.error(f"Error getting chat history: {str(e)}")
@@ -412,11 +415,13 @@ class Database:
             ).sort("timestamp", -1).limit(limit)
             
             formatted_history = []
-            for msg in reversed(list(history)):
+            history_list = list(history)
+            for msg in reversed(history_list):  # Process in chronological order
                 user_name = msg.get('first_name') or msg.get('username') or f"User{msg['user_id']}"
-                formatted_history.append(f"{user_name}: {msg['message']}")
+                if msg.get('message'):
+                    formatted_history.append(f"{user_name}: {msg['message']}")
                 if msg.get('response'):
-                    formatted_history.append(f"AI: {msg['response']}")
+                    formatted_history.append(f"Girlfriend: {msg['response']}")
                 
             return "\n".join(formatted_history)
         except Exception as e:
