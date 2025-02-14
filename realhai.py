@@ -1406,8 +1406,6 @@ def process_therapy_response(message, single_user=True, context=None):
             
             # Combine contexts
             context_str = ""
-            if db_context:
-                context_str += f"{db_context}\n"
             if recent_memory:
                 memory_str = "\n".join([f"{'User' if msg['role'] == 'user' else 'You'}: {msg['content']}" 
                                     for msg in recent_memory[:-1]])
@@ -1415,7 +1413,7 @@ def process_therapy_response(message, single_user=True, context=None):
 
             enhanced_prompt = (
                 f"{base_prompt}"
-                f"Previous chat:\n{context_str}\n\n"
+                f"Final conversation history:\n{context_str}\n\n"
                 f"Current message: {message.text}"
             )
         else:
