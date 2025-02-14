@@ -1358,6 +1358,16 @@ def process_therapy_response(message, single_user=True, context=None):
         # Update last interaction time
         update_conversation_activity(chat_id, user_id, get_user_name(message))
 
+        # Check if it's a group chat with multiple users
+        is_group_chat = False
+        active_users = []
+        if chat_id in active_conversations:
+            active_users = [data['name'] for data in active_conversations[chat_id]['users'].values()]
+            is_group_chat = len(active_users) > 1
+
+        logger.debug(f"Active users: {active_users}")
+        logger.debug(f"Is group chat: {is_group_chat}")
+
         # Base prompt that's common for both single and group chats
         base_prompt = (
             "You are a sweet and caring Indian girlfriend chatting on Telegram. Follow these rules:\n"
@@ -1371,8 +1381,8 @@ def process_therapy_response(message, single_user=True, context=None):
         # Get or create context key
         context_key = f"{chat_id}_{user_id}"
         
-        # Handle context differently for single user and group chats
-        if single_user:
+        # Handle context based on chat type
+        if not is_group_chat:
             # Store message in database
             db.store_user_context(chat_id, user_id, message.text)
             
@@ -1409,7 +1419,7 @@ def process_therapy_response(message, single_user=True, context=None):
                 f"Current message: {message.text}"
             )
         else:
-            # For group chats - use the existing context system
+            # For group chats with multiple users - don't use context
             enhanced_prompt = (
                 f"{base_prompt}"
                 f"Current message from {get_user_name(message)}: {message.text}"
@@ -1420,10 +1430,10 @@ def process_therapy_response(message, single_user=True, context=None):
         ai_response = None
         for attempt in range(max_retries):
             logger.debug(f"Attempt {attempt + 1} to get AI response")
-            ai_response = get_gemini_response(enhanced_prompt, context_key if single_user else None)
+            ai_response = get_gemini_response(enhanced_prompt, context_key if not is_group_chat else None)
             if ai_response:
                 # Add AI response to context only for single user chats
-                if single_user:
+                if not is_group_chat:
                     user_contexts[context_key]['conversation'].append({
                         'role': 'assistant',
                         'content': ai_response
@@ -1602,7 +1612,7 @@ def handle_all_replies(message):
                 update_conversation_activity(chat_id, user_id, user_name, message.text)
                 
                 # Get properly formatted context
-                context = get_conversation_context(chat_id, user_id)
+                context = get_conversation_context(chat_id)
                 
                 # Process response with context
                 response = process_therapy_response(message, single_user=False, context=context)
@@ -2047,23 +2057,14 @@ def store_bot_response(chat_id, response_text):
     if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
         group_chat_history[chat_id].pop(0)
 
-def get_conversation_context(chat_id, user_id=None):
+def get_conversation_context(chat_id):
     """Get formatted conversation context"""
-    # For group chats, only return context if it's a single user conversation
     if chat_id not in group_chat_history:
         return ""
         
-    messages = group_chat_history[chat_id][-20:]  # Last 20 messages
-    
-    # For group chats, check if all messages are from the same user
-    if len(messages) > 0:
-        unique_users = {msg['user_id'] for msg in messages if not msg['is_bot']}
-        # If there's more than one user or if the specified user_id doesn't match
-        if len(unique_users) > 1 or (user_id and user_id not in unique_users):
-            return ""
-    
     context = []
     current_speaker = None
+    messages = group_chat_history[chat_id][-20:]  # Last 10 messages
     
     for msg in messages:
         # Skip consecutive messages from the same user
