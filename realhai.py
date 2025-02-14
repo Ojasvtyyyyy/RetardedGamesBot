@@ -1602,7 +1602,7 @@ def handle_all_replies(message):
                 update_conversation_activity(chat_id, user_id, user_name, message.text)
                 
                 # Get properly formatted context
-                context = get_conversation_context(chat_id)
+                context = get_conversation_context(chat_id, user_id)
                 
                 # Process response with context
                 response = process_therapy_response(message, single_user=False, context=context)
@@ -2047,14 +2047,23 @@ def store_bot_response(chat_id, response_text):
     if len(group_chat_history[chat_id]) > MAX_HISTORY_LENGTH:
         group_chat_history[chat_id].pop(0)
 
-def get_conversation_context(chat_id):
+def get_conversation_context(chat_id, user_id=None):
     """Get formatted conversation context"""
+    # For group chats, only return context if it's a single user conversation
     if chat_id not in group_chat_history:
         return ""
         
+    messages = group_chat_history[chat_id][-20:]  # Last 20 messages
+    
+    # For group chats, check if all messages are from the same user
+    if len(messages) > 0:
+        unique_users = {msg['user_id'] for msg in messages if not msg['is_bot']}
+        # If there's more than one user or if the specified user_id doesn't match
+        if len(unique_users) > 1 or (user_id and user_id not in unique_users):
+            return ""
+    
     context = []
     current_speaker = None
-    messages = group_chat_history[chat_id][-20:]  # Last 10 messages
     
     for msg in messages:
         # Skip consecutive messages from the same user
