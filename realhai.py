@@ -1806,100 +1806,59 @@ def check_password(message):
     """Verify password and send history if correct"""
     try:
         if message.from_user.id != 6592905337:
-            logger.debug(f"Unauthorized user {message.from_user.id} attempted to access history")
             return bot.reply_to(message, "ℹ️ You don't have permission to use this command.")
             
-        logger.debug(f"Checking password: {message.text}")
         if message.text == "iamgay123@#":
-            logger.info("Password correct, fetching history...")
             # Get ALL history from database (no limit)
             history = db.get_chat_history(0)  # 0 means no limit
-            
-            if not history:
-                logger.warning("No history found in database")
-                return bot.reply_to(message, "ℹ️ No history found!")
-                
-            logger.info(f"Found {len(history)} history entries")
-            history_text = "ℹ️ Chat History:\n\n"
-            entry_count = 0
-            
-            for entry in history:
-                try:
-                    # Try to get chat info for group name
-                    chat_title = "Private Chat"
-                    chat_type = entry.get('chat_type', 'unknown')
-                    chat_id = entry.get('chat_id', 'unknown')
-                    
-                    if chat_type in ['group', 'supergroup']:
-                        try:
-                            chat = bot.get_chat(chat_id)
-                            chat_title = chat.title
-                            logger.debug(f"Retrieved group title: {chat_title} for chat_id: {chat_id}")
-                        except Exception as chat_error:
-                            logger.error(f"Failed to get chat title for {chat_id}: {str(chat_error)}")
-                            chat_title = f"Group/Supergroup ({chat_id})"
-                    
-                    # Format the entry with detailed error checking
-                    entry_text = (
-                        f"Time: {entry.get('timestamp', 'unknown')}\n"
-                        f"Chat ID: {chat_id}\n"
-                        f"Chat Type: {chat_type}\n"
-                        f"Chat Name: {chat_title}\n"
-                        f"User ID: {entry.get('user_id', 'unknown')}\n"
-                        f"Username: @{entry.get('username', 'unknown')}\n"
-                        f"First Name: {entry.get('first_name', 'unknown')}\n"
-                        f"Last Name: {entry.get('last_name', 'unknown')}\n"
-                        f"Message: {entry.get('message', 'unknown')}\n"
-                        f"Response: {entry.get('response', 'unknown')}\n"
-                        f"{'='*50}\n\n"
-                    )
-                    
-                    history_text += entry_text
-                    entry_count += 1
-                    
-                    if entry_count % 100 == 0:
-                        logger.debug(f"Processed {entry_count} entries...")
+            if history:
+                history_text = "ℹ️ Chat History:\n\n"
+                for entry in history:
+                    try:
+                        # Try to get chat info for group name
+                        chat_title = "Private Chat"
+                        if entry['chat_type'] in ['group', 'supergroup']:
+                            try:
+                                chat = bot.get_chat(entry['chat_id'])
+                                chat_title = chat.title
+                            except:
+                                chat_title = f"Group/Supergroup ({entry['chat_id']})"
                         
-                except Exception as e:
-                    logger.error(f"Error formatting entry: {str(e)}", exc_info=True)
-                    continue
-            
-            logger.info(f"Successfully formatted {entry_count} entries")
-            
-            try:
-                # Save formatted history to temporary file
-                temp_file_path = "temp_history.txt"
-                logger.debug(f"Writing history to {temp_file_path}")
+                        history_text += (
+                            f"Time: {entry['timestamp']}\n"
+                            f"Chat ID: {entry['chat_id']}\n"
+                            f"Chat Type: {entry['chat_type']}\n"
+                            f"Chat Name: {chat_title}\n"
+                            f"User ID: {entry['user_id']}\n"
+                            f"Username: @{entry['username']}\n"
+                            f"First Name: {entry['first_name']}\n"
+                            f"Last Name: {entry['last_name']}\n"
+                            f"Message: {entry['message']}\n"
+                            f"Response: {entry['response']}\n"
+                            f"{'='*50}\n\n"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error formatting entry: {str(e)}")
+                        continue
                 
-                with open(temp_file_path, "w", encoding='utf-8') as f:
+                # Save formatted history to temporary file
+                with open("temp_history.txt", "w", encoding='utf-8') as f:
                     f.write(history_text)
                 
                 # Send file
-                logger.debug("Sending history file...")
-                with open(temp_file_path, "rb") as f:
-                    bot.send_document(
-                        message.chat.id,
-                        f,
-                        caption="ℹ️ Here's the chat history!",
-                        timeout=60  # Increased timeout for large files
-                    )
+                with open("temp_history.txt", "rb") as f:
+                    bot.send_document(message.chat.id, f, caption="ℹ️ Here's the chat history!")
                 
                 # Clean up
-                logger.debug("Cleaning up temporary file...")
-                os.remove(temp_file_path)
-                logger.info("History command completed successfully")
-                
-            except Exception as file_error:
-                logger.error(f"Error handling history file: {str(file_error)}", exc_info=True)
-                bot.reply_to(message, "ℹ️ Error creating history file. Please try again.")
-                
+                os.remove("temp_history.txt")
+            else:
+                bot.reply_to(message, "ℹ️ No history found!")
         else:
-            logger.debug("Incorrect password entered")
             bot.reply_to(message, "ℹ️ Incorrect password!")
             
     except Exception as e:
-        logger.error(f"Error in check_password: {str(e)}", exc_info=True)
-        bot.reply_to(message, "ℹ️ An error occurred while processing your request!")
+        logger.error(f"Error in password check: {str(e)}")
+        bot.reply_to(message, "ℹ️ An error occurred!")
 
 # Add this at the bottom of your file, just before the if __name__ == "__main__": block
 def register_handlers():
