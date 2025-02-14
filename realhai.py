@@ -1111,7 +1111,7 @@ def get_gemini_response(prompt, context_key):
             # Then add conversation history if it exists
             chat_history = ""
             if conversation_history:
-                chat_history = f"PREVIOUS CHAT CONTEXT:\n{conversation_history}\n\n"
+                chat_history = f"FINAL CONVERSATION HISTORY:\n{conversation_history}\n\n"
 
             # Finally add the current message and important note
             current_message = (
@@ -1814,18 +1814,32 @@ def check_password(message):
             if history:
                 history_text = "ℹ️ Chat History:\n\n"
                 for entry in history:
-                    history_text += (
-                        f"Time: {entry['timestamp']}\n"
-                        f"Chat ID: {entry['chat_id']}\n"
-                        f"Chat Type: {entry['chat_type']}\n"
-                        f"User ID: {entry['user_id']}\n"
-                        f"Username: @{entry['username']}\n"
-                        f"First Name: {entry['first_name']}\n"
-                        f"Last Name: {entry['last_name']}\n"
-                        f"Message: {entry['message']}\n"
-                        f"Response: {entry['response']}\n"
-                        f"{'='*50}\n\n"
-                    )
+                    try:
+                        # Try to get chat info for group name
+                        chat_title = "Private Chat"
+                        if entry['chat_type'] in ['group', 'supergroup']:
+                            try:
+                                chat = bot.get_chat(entry['chat_id'])
+                                chat_title = chat.title
+                            except:
+                                chat_title = f"Group/Supergroup ({entry['chat_id']})"
+                        
+                        history_text += (
+                            f"Time: {entry['timestamp']}\n"
+                            f"Chat ID: {entry['chat_id']}\n"
+                            f"Chat Type: {entry['chat_type']}\n"
+                            f"Chat Name: {chat_title}\n"
+                            f"User ID: {entry['user_id']}\n"
+                            f"Username: @{entry['username']}\n"
+                            f"First Name: {entry['first_name']}\n"
+                            f"Last Name: {entry['last_name']}\n"
+                            f"Message: {entry['message']}\n"
+                            f"Response: {entry['response']}\n"
+                            f"{'='*50}\n\n"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error formatting entry: {str(e)}")
+                        continue
                 
                 # Save formatted history to temporary file
                 with open("temp_history.txt", "w", encoding='utf-8') as f:
